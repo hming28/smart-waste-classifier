@@ -91,7 +91,7 @@ def load_model(path):
 st.markdown("""
 <style>
     .stMainBlockContainer {
-        padding-top: 0 !important;
+        padding-top: 10px !important;
     }
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
