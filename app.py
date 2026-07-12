@@ -91,7 +91,7 @@ def load_model(path):
 st.markdown("""
 <style>
     .stMainBlockContainer {
-        padding-top: 10px !important;
+        padding-top: 30px !important;
     }
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -160,6 +160,7 @@ with tab_home:
             "Model",
             model_labels,
             label_visibility="collapsed",
+            default="CNN",
         )
 
         selected_model = selected_model_label.replace(" (未訓練)", "") if selected_model_label else "CNN"
