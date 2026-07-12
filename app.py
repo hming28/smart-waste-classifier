@@ -124,6 +124,9 @@ st.markdown("""
         text-align: center;
         margin: 1rem 0;
     }
+    [data-theme="dark"] .prediction-card {
+        background: linear-gradient(135deg, #4a5acf 0%, #5a3d8a 100%);
+    }
     .prediction-label {
         font-size: 1rem;
         opacity: 0.9;
@@ -146,7 +149,8 @@ st.markdown("""
         background: white;
     }
     .info-card {
-        background: #f8f9fa;
+        background: var(--secondary-background-color);
+        color: var(--text-color);
         border-radius: 12px;
         padding: 1.5rem;
         margin: 0.5rem 0;
@@ -155,6 +159,9 @@ st.markdown("""
     .model-unavailable {
         color: #e74c3c;
         font-size: 0.8rem;
+    }
+    [data-theme="dark"] .stProgress > div > div > div > div {
+        background-color: var(--text-color);
     }
 </style>
 """, unsafe_allow_html=True)
