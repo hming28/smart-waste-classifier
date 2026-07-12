@@ -177,8 +177,9 @@ with tab_home:
             type=["jpg", "jpeg", "png", "webp"],
         )
 
-        # Camera input
-        camera_file = st.camera_input("Or take a photo")
+        # Camera input (toggle)
+        use_camera = st.checkbox("📷 Or take a photo with camera")
+        camera_file = st.camera_input("Take a photo") if use_camera else None
 
         # Use camera if available, otherwise use uploaded file
         if camera_file is not None:
