@@ -18,7 +18,7 @@ CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 MODELS = {
     "CNN": "cnn_garbage_classifier_4class.h5",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
-    "ResNet50": "resnet50_model.keras",
+    "ResNet50": "resnet50_model_quantized.tflite",
 }
 
 # Recycling info
@@ -56,6 +56,12 @@ RECYCLE_INFO = {
 
 # Load model with compatibility fix
 def load_model_compat(path):
+    # .tflite files use TFLite interpreter
+    if path.endswith(".tflite"):
+        interpreter = tf.lite.Interpreter(model_path=path)
+        interpreter.allocate_tensors()
+        return interpreter
+
     # .keras files load directly
     if path.endswith(".keras"):
         return tf.keras.models.load_model(path, compile=False)
@@ -85,6 +91,18 @@ def load_model_compat(path):
     model = tf.keras.models.load_model(tmp, compile=False)
     os.remove(tmp)
     return model
+
+
+def predict_with_model(model, img_array):
+    # TFLite interpreter
+    if isinstance(model, tf.lite.Interpreter):
+        input_details = model.get_input_details()
+        output_details = model.get_output_details()
+        model.set_tensor(input_details[0]['index'], img_array.astype(np.float32))
+        model.invoke()
+        return model.get_tensor(output_details[0]['index'])
+    # Keras model
+    return model.predict(img_array, verbose=0)
 
 
 @st.cache_resource
@@ -209,7 +227,7 @@ with tab_home:
             img_array = np.expand_dims(img_array, axis=0)
 
             with st.spinner(f"AI Detecting with {selected_model}..."):
-                predictions = model.predict(img_array, verbose=0)
+                predictions = predict_with_model(model, img_array)
                 pred_index = np.argmax(predictions[0])
                 pred_class = CLASS_NAMES[pred_index]
                 confidence = float(predictions[0][pred_index]) * 100
