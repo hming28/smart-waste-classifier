@@ -90,19 +90,6 @@ def load_model(path):
 # Custom CSS
 st.markdown("""
 <style>
-    .main-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        text-align: center;
-        color: #2c3e50;
-        margin-bottom: 0.3rem;
-    }
-    .subtitle {
-        text-align: center;
-        color: #7f8c8d;
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-    }
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 16px;
@@ -145,10 +132,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Title
-st.markdown('<div class="main-title">♻️ Smart Waste Classification</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">AI-Powered Waste Sorting Assistant</div>', unsafe_allow_html=True)
 
 # Tabs
 tab_home, tab_about = st.tabs(["🏠 Home", "ℹ️ About"])
