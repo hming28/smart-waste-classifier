@@ -177,9 +177,18 @@ with tab_home:
             type=["jpg", "jpeg", "png", "webp"],
         )
 
-        if uploaded_file is not None:
+        # Camera input
+        camera_file = st.camera_input("Or take a photo")
+
+        # Use camera if available, otherwise use uploaded file
+        if camera_file is not None:
+            image = Image.open(camera_file).convert("RGB")
+            st.image(image, caption="Photo taken", width=200)
+        elif uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
             st.image(image, caption="Uploaded Image", width=200)
+        else:
+            image = None
 
         # Start Detection button
         detect_clicked = st.button("🔍 Start Detection", use_container_width=True)
@@ -187,10 +196,10 @@ with tab_home:
     with col_right:
         if not model_available:
             st.warning(f"⚠️ {selected_model} model is not trained yet. Please select CNN model.")
-        elif uploaded_file is None:
-            st.info("📷 Please upload an image on the left")
+        elif image is None:
+            st.info("📷 Please upload an image or take a photo")
         elif not detect_clicked:
-            st.info("⬆️ Upload an image and click Start Detection")
+            st.info("⬆️ Upload/take a photo and click Start Detection")
         else:
             # Run prediction
             model = load_model(MODELS[selected_model])
