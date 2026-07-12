@@ -178,13 +178,12 @@ with tab_home:
         )
 
         # Camera input (toggle)
-        use_camera = st.checkbox("📷 Or take a photo with camera")
+        use_camera = st.toggle("📷 Camera Mode")
         camera_file = st.camera_input("Take a photo") if use_camera else None
 
         # Use camera if available, otherwise use uploaded file
         if camera_file is not None:
             image = Image.open(camera_file).convert("RGB")
-            st.image(image, caption="Photo taken", width=200)
         elif uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
             st.image(image, caption="Uploaded Image", width=200)
