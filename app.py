@@ -18,7 +18,7 @@ CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 MODELS = {
     "CNN": "cnn_garbage_classifier_4class.h5",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
-    "ResNet50": "resnet50_garbage_classifier_4class.h5",
+    "ResNet50": "resnet50_model.keras",
 }
 
 # Recycling info
@@ -268,7 +268,7 @@ with tab_about:
     |-------|--------|
     | CNN | ✅ Available |
     | MobileNetV2 | ✅ Available |
-    | ResNet50 | 🔜 Coming soon |
+    | ResNet50 | ✅ Available |
 
     ### Supported Waste Types
     | Category | Examples |
