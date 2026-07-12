@@ -17,7 +17,7 @@ CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 # Model config
 MODELS = {
     "CNN": "cnn_garbage_classifier_4class.h5",
-    "MobileNetV2": "mobilenetv2_garbage_classifier_4class.h5",
+    "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_garbage_classifier_4class.h5",
 }
 
@@ -56,6 +56,11 @@ RECYCLE_INFO = {
 
 # Load model with compatibility fix
 def load_model_compat(path):
+    # .keras files load directly
+    if path.endswith(".keras"):
+        return tf.keras.models.load_model(path, compile=False)
+
+    # .h5 files need quantization_config fix
     import h5py, json, shutil, tempfile
 
     def strip_quantization_config(config):
