@@ -91,17 +91,17 @@ def load_model(path):
 st.markdown("""
 <style>
     .main-title {
-        font-size: 2.5rem;
+        font-size: 1.8rem;
         font-weight: 700;
         text-align: center;
         color: #2c3e50;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.3rem;
     }
     .subtitle {
         text-align: center;
         color: #7f8c8d;
-        font-size: 1.1rem;
-        margin-bottom: 1rem;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
     }
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -150,28 +150,6 @@ st.markdown("""
 st.markdown('<div class="main-title">♻️ Smart Waste Classification</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle">AI-Powered Waste Sorting Assistant</div>', unsafe_allow_html=True)
 
-# Model selector
-model_options = []
-model_files = {}
-for name, filename in MODELS.items():
-    available = os.path.exists(filename)
-    model_files[name] = available
-    if available:
-        model_options.append(name)
-    else:
-        model_options.append(f"{name} (未訓練)")
-
-selected_model_label = st.radio(
-    "Select Model",
-    model_options,
-    horizontal=True,
-    label_visibility="collapsed",
-)
-
-# Extract actual model name
-selected_model = selected_model_label.replace(" (未訓練)", "")
-model_available = model_files.get(selected_model, False)
-
 # Tabs
 tab_home, tab_about = st.tabs(["🏠 Home", "ℹ️ About"])
 
@@ -180,16 +158,36 @@ with tab_home:
     col_left, col_right = st.columns([1, 1])
 
     with col_left:
-        st.subheader("📷 Upload Photo")
+        # Model selector (segmented control)
+        st.markdown("**Select Model**")
+        model_labels = []
+        model_files = {}
+        for name, filename in MODELS.items():
+            available = os.path.exists(filename)
+            model_files[name] = available
+            if available:
+                model_labels.append(name)
+            else:
+                model_labels.append(f"{name} (未訓練)")
+
+        selected_model_label = st.segmented_control(
+            "Model",
+            model_labels,
+            label_visibility="collapsed",
+        )
+
+        selected_model = selected_model_label.replace(" (未訓練)", "") if selected_model_label else "CNN"
+        model_available = model_files.get(selected_model, False)
+
+        # Upload photo
         uploaded_file = st.file_uploader(
             "Upload a photo of waste",
             type=["jpg", "jpeg", "png", "webp"],
-            label_visibility="collapsed",
         )
 
         if uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
-            st.image(image, caption="Uploaded Image", use_container_width=True)
+            st.image(image, caption="Uploaded Image", width=200)
 
         # Start Detection button
         detect_clicked = st.button("🔍 Start Detection", use_container_width=True)
