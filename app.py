@@ -90,6 +90,9 @@ def load_model(path):
 # Custom CSS
 st.markdown("""
 <style>
+    .stMainBlockContainer {
+        padding-top: 0 !important;
+    }
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 16px;
