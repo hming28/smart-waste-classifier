@@ -136,9 +136,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Title
-st.markdown("## ♻️ Smart Waste Classification")
-
 # Tabs
 tab_home, tab_about = st.tabs(["🏠 Home", "ℹ️ About"])
 
