@@ -159,7 +159,7 @@ with tab_home:
             if available:
                 model_labels.append(name)
             else:
-                model_labels.append(f"{name} (未訓練)")
+                model_labels.append(f"{name} (Not trained)")
 
         selected_model_label = st.segmented_control(
             "Model",
@@ -168,7 +168,7 @@ with tab_home:
             default="CNN",
         )
 
-        selected_model = selected_model_label.replace(" (未訓練)", "") if selected_model_label else "CNN"
+        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "CNN"
         model_available = model_files.get(selected_model, False)
 
         # Upload photo
@@ -186,11 +186,11 @@ with tab_home:
 
     with col_right:
         if not model_available:
-            st.warning(f"⚠️ {selected_model} 模型尚未訓練，請選擇 CNN 模型。")
+            st.warning(f"⚠️ {selected_model} model is not trained yet. Please select CNN model.")
         elif uploaded_file is None:
-            st.info("📷 請先在左側上傳圖片")
+            st.info("📷 Please upload an image on the left")
         elif not detect_clicked:
-            st.info("⬆️ 上傳圖片後，按 Start Detection 開始辨識")
+            st.info("⬆️ Upload an image and click Start Detection")
         else:
             # Run prediction
             model = load_model(MODELS[selected_model])
@@ -250,7 +250,7 @@ with tab_about:
     AI-powered waste classification system. Upload a photo, and the AI identifies the waste type and guides proper disposal.
 
     ### How does it work?
-    - **CNN (Convolutional Neural Network)** trained on waste images
+    - Multiple AI models trained on waste images
     - Classifies into 4 categories: **Glass, Metal, Paper, Plastic**
     - Provides confidence scores for each category
 
@@ -258,7 +258,7 @@ with tab_about:
     | Model | Status |
     |-------|--------|
     | CNN | ✅ Available |
-    | MobileNetV2 | 🔜 Coming soon |
+    | MobileNetV2 | ✅ Available |
     | ResNet50 | 🔜 Coming soon |
 
     ### Supported Waste Types
