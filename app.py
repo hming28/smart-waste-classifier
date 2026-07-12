@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import numpy as np
 from PIL import Image
@@ -7,11 +8,18 @@ import tensorflow as tf
 st.set_page_config(
     page_title="Smart Waste AI",
     page_icon="♻️",
-    layout="centered"
+    layout="wide"
 )
 
 # Class names
 CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
+
+# Model config
+MODELS = {
+    "CNN": "cnn_garbage_classifier_4class.h5",
+    "MobileNetV2": "mobilenetv2_garbage_classifier_4class.h5",
+    "ResNet50": "resnet50_garbage_classifier_4class.h5",
+}
 
 # Recycling info
 RECYCLE_INFO = {
@@ -48,7 +56,7 @@ RECYCLE_INFO = {
 
 # Load model with compatibility fix
 def load_model_compat(path):
-    import h5py, json, shutil, tempfile, os
+    import h5py, json, shutil, tempfile
 
     def strip_quantization_config(config):
         if isinstance(config, dict):
@@ -75,11 +83,9 @@ def load_model_compat(path):
 
 
 @st.cache_resource
-def load_model():
-    return load_model_compat("cnn_garbage_classifier_4class.h5")
+def load_model(path):
+    return load_model_compat(path)
 
-
-model = load_model()
 
 # Custom CSS
 st.markdown("""
@@ -95,7 +101,7 @@ st.markdown("""
         text-align: center;
         color: #7f8c8d;
         font-size: 1.1rem;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
     }
     .prediction-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -133,81 +139,117 @@ st.markdown("""
         margin: 0.5rem 0;
         border-left: 4px solid;
     }
+    .model-unavailable {
+        color: #e74c3c;
+        font-size: 0.8rem;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# Title
+st.markdown('<div class="main-title">♻️ Smart Waste Classification</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">AI-Powered Waste Sorting Assistant</div>', unsafe_allow_html=True)
+
+# Model selector
+model_options = []
+model_files = {}
+for name, filename in MODELS.items():
+    available = os.path.exists(filename)
+    model_files[name] = available
+    if available:
+        model_options.append(name)
+    else:
+        model_options.append(f"{name} (未訓練)")
+
+selected_model_label = st.radio(
+    "Select Model",
+    model_options,
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+# Extract actual model name
+selected_model = selected_model_label.replace(" (未訓練)", "")
+model_available = model_files.get(selected_model, False)
 
 # Tabs
 tab_home, tab_about = st.tabs(["🏠 Home", "ℹ️ About"])
 
 with tab_home:
-    st.markdown('<div class="main-title">♻️ Smart Waste Classification</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">AI-Powered Waste Sorting Assistant</div>', unsafe_allow_html=True)
+    # Left-right layout
+    col_left, col_right = st.columns([1, 1])
 
-    uploaded_file = st.file_uploader(
-        "Upload a photo of waste",
-        type=["jpg", "jpeg", "png", "webp"],
-        help="Supported formats: JPG, PNG, WebP"
-    )
+    with col_left:
+        st.subheader("📷 Upload Photo")
+        uploaded_file = st.file_uploader(
+            "Upload a photo of waste",
+            type=["jpg", "jpeg", "png", "webp"],
+            label_visibility="collapsed",
+        )
 
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="Uploaded Image", use_container_width=True)
+        if uploaded_file is not None:
+            image = Image.open(uploaded_file).convert("RGB")
+            st.image(image, caption="Uploaded Image", use_container_width=True)
 
-        img_resized = image.resize((224, 224))
-        img_array = np.array(img_resized) / 255.0
-        img_array = np.expand_dims(img_array, axis=0)
+        # Start Detection button
+        detect_clicked = st.button("🔍 Start Detection", use_container_width=True)
 
-        with st.spinner("AI Detecting..."):
-            predictions = model.predict(img_array, verbose=0)
-            pred_index = np.argmax(predictions[0])
-            pred_class = CLASS_NAMES[pred_index]
-            confidence = float(predictions[0][pred_index]) * 100
+    with col_right:
+        if not model_available:
+            st.warning(f"⚠️ {selected_model} 模型尚未訓練，請選擇 CNN 模型。")
+        elif uploaded_file is None:
+            st.info("📷 請先在左側上傳圖片")
+        elif not detect_clicked:
+            st.info("⬆️ 上傳圖片後，按 Start Detection 開始辨識")
+        else:
+            # Run prediction
+            model = load_model(MODELS[selected_model])
 
-        info = RECYCLE_INFO[pred_class]
+            img_resized = image.resize((224, 224))
+            img_array = np.array(img_resized) / 255.0
+            img_array = np.expand_dims(img_array, axis=0)
 
-        st.markdown(f"""
-        <div class="prediction-card">
-            <div class="prediction-label">Prediction</div>
-            <div class="prediction-value">{info['icon']} {pred_class.title()}</div>
-            <div class="confidence-bar">
-                <div class="confidence-fill" style="width: {confidence}%"></div>
-            </div>
-            <div class="prediction-label">Confidence: {confidence:.1f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+            with st.spinner(f"AI Detecting with {selected_model}..."):
+                predictions = model.predict(img_array, verbose=0)
+                pred_index = np.argmax(predictions[0])
+                pred_class = CLASS_NAMES[pred_index]
+                confidence = float(predictions[0][pred_index]) * 100
 
-        st.subheader("📊 All Probabilities")
-        probs = {CLASS_NAMES[i]: float(predictions[0][i]) * 100 for i in range(len(CLASS_NAMES))}
-        sorted_probs = dict(sorted(probs.items(), key=lambda x: x[1], reverse=True))
-        for cls, prob in sorted_probs.items():
-            st.progress(prob / 100, text=f"{cls.title()}: {prob:.1f}%")
+            info = RECYCLE_INFO[pred_class]
 
-        st.subheader("♻️ Recycling Guide")
-        col1, col2 = st.columns(2)
-        with col1:
+            # Prediction card
             st.markdown(f"""
-            <div class="info-card" style="border-color: {info['color']}">
-                <strong>Bin:</strong> {info['bin']}<br>
-                <strong>Description:</strong> {info['description']}
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"""
-            <div class="info-card" style="border-color: {info['color']}">
-                <strong>Tip:</strong> {info['tip']}
+            <div class="prediction-card">
+                <div class="prediction-label">Prediction</div>
+                <div class="prediction-value">{info['icon']} {pred_class.title()}</div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width: {confidence}%"></div>
+                </div>
+                <div class="prediction-label">Confidence: {confidence:.1f}%</div>
             </div>
             """, unsafe_allow_html=True)
 
-    else:
-        st.info("📷 Upload a photo of waste (glass, metal, paper, or plastic) to get started.")
-        st.subheader("Supported Categories")
-        cols = st.columns(4)
-        for i, (cls, info) in enumerate(RECYCLE_INFO.items()):
-            with cols[i]:
+            # All probabilities
+            st.markdown("**📊 All Probabilities**")
+            probs = {CLASS_NAMES[i]: float(predictions[0][i]) * 100 for i in range(len(CLASS_NAMES))}
+            sorted_probs = dict(sorted(probs.items(), key=lambda x: x[1], reverse=True))
+            for cls, prob in sorted_probs.items():
+                st.progress(prob / 100, text=f"{cls.title()}: {prob:.1f}%")
+
+            # Recycling guide
+            st.markdown("**♻️ Recycling Guide**")
+            col1, col2 = st.columns(2)
+            with col1:
                 st.markdown(f"""
-                <div style="text-align:center; padding:1rem; background:#f8f9fa; border-radius:12px;">
-                    <div style="font-size:2rem;">{info['icon']}</div>
-                    <div style="font-weight:600; font-size:1.1rem;">{cls.title()}</div>
+                <div class="info-card" style="border-color: {info['color']}">
+                    <strong>Bin:</strong> {info['bin']}<br>
+                    <strong>Description:</strong> {info['description']}
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"""
+                <div class="info-card" style="border-color: {info['color']}">
+                    <strong>Tip:</strong> {info['tip']}
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -222,6 +264,13 @@ with tab_about:
     - Classifies into 4 categories: **Glass, Metal, Paper, Plastic**
     - Provides confidence scores for each category
 
+    ### Supported Models
+    | Model | Status |
+    |-------|--------|
+    | CNN | ✅ Available |
+    | MobileNetV2 | 🔜 Coming soon |
+    | ResNet50 | 🔜 Coming soon |
+
     ### Supported Waste Types
     | Category | Examples |
     |----------|----------|
@@ -231,5 +280,5 @@ with tab_about:
     | 🧴 Plastic | Bottles, containers, packaging |
 
     ### Team
-    Built for AI Course Assignment 🎓
+    Built for AI Course Assignment
     """)
