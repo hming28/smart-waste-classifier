@@ -3,6 +3,8 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
+from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
 
 # Page config
 st.set_page_config(
@@ -11,7 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Class names
+# Class names — all 3 models now output in this same alphabetical order
+# (MobileNetV2's output layer was permuted to match; CNN/ResNet50 already matched by default)
 CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 
 # Model config
@@ -19,6 +22,14 @@ MODELS = {
     "CNN": "cnn_garbage_classifier_4class.h5",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
+}
+
+# Each model was trained with a different input normalization — this has to match
+# training exactly, or predictions become unreliable even though the model "runs" fine.
+PREPROCESS_FUNCS = {
+    "CNN": lambda arr: arr / 255.0,              # trained with rescale=1./255
+    "MobileNetV2": mobilenet_preprocess,          # scales to [-1, 1]
+    "ResNet50": resnet_preprocess,                # ImageNet mean-subtraction, BGR
 }
 
 # Recycling info
@@ -98,7 +109,12 @@ def predict_with_model(model, img_array):
     if isinstance(model, tf.lite.Interpreter):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
-        model.set_tensor(input_details[0]['index'], img_array.astype(np.float32))
+        # Cast to whatever dtype this specific .tflite file actually expects.
+        # NOTE: if this file was created with full-integer quantization, it may expect
+        # raw uint8 [0,255] input instead of the preprocessed float array — check the
+        # conversion script that produced resnet50_model_quantized.tflite to confirm.
+        input_dtype = input_details[0]['dtype']
+        model.set_tensor(input_details[0]['index'], img_array.astype(input_dtype))
         model.invoke()
         return model.get_tensor(output_details[0]['index'])
     # Keras model
@@ -230,8 +246,10 @@ with tab_home:
             model = load_model(MODELS[selected_model])
 
             img_resized = image.resize((224, 224))
-            img_array = np.array(img_resized) / 255.0
+            img_array = np.array(img_resized).astype(np.float32)
             img_array = np.expand_dims(img_array, axis=0)
+            # Use this model's own preprocessing — not a shared /255.0 for everything
+            img_array = PREPROCESS_FUNCS[selected_model](img_array)
 
             with st.spinner(f"AI Detecting with {selected_model}..."):
                 predictions = predict_with_model(model, img_array)
