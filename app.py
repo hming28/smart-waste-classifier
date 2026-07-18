@@ -13,8 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Class names — all 3 models now output in this same alphabetical order
-# (MobileNetV2's output layer was permuted to match; CNN/ResNet50 already matched by default)
+# Class names — all models output in alphabetical order: glass, metal, paper, plastic
 CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 
 # Model config
@@ -24,12 +23,11 @@ MODELS = {
     "ResNet50": "resnet50_model_quantized.tflite",
 }
 
-# Each model was trained with a different input normalization — this has to match
-# training exactly, or predictions become unreliable even though the model "runs" fine.
+# Each model was trained with a different input normalization
 PREPROCESS_FUNCS = {
-    "CNN": lambda arr: arr / 255.0,              # trained with rescale=1./255
+    "CNN": lambda arr: arr / 255.0,              # AdvancedCNN: rescale=1./255
     "MobileNetV2": mobilenet_preprocess,          # scales to [-1, 1]
-    "ResNet50": resnet_preprocess,                # ImageNet mean-subtraction, BGR
+    "ResNet50": resnet_preprocess,                # ImageNet mean-subtraction
 }
 
 # Recycling info
@@ -209,7 +207,7 @@ with tab_home:
             default="ResNet50",
         )
 
-        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "ResNet50"
+        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "CNN"
         model_available = model_files.get(selected_model, False)
 
         # Upload photo
@@ -236,11 +234,7 @@ with tab_home:
 
     with col_right:
         if not model_available:
-            available_models = [name for name, ok in model_files.items() if ok]
-            if available_models:
-                st.warning(f"⚠️ {selected_model} model is not trained yet. Please select one of: {', '.join(available_models)}.")
-            else:
-                st.warning(f"⚠️ {selected_model} model is not trained yet, and no other model files were found either.")
+            st.warning(f"⚠️ {selected_model} model is not trained yet. Please select CNN model.")
         elif image is None:
             st.info("📷 Please upload an image or take a photo")
         elif not detect_clicked:
