@@ -19,7 +19,7 @@ CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 
 # Model config
 MODELS = {
-    "CNN": "cnn_garbage_classifier_4class.h5",
+    "CNN": "AdvancedCNN_none_classweight.keras",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
 }
@@ -206,10 +206,10 @@ with tab_home:
             "Model",
             model_labels,
             label_visibility="collapsed",
-            default="CNN",
+            default="ResNet50",
         )
 
-        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "CNN"
+        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "ResNet50"
         model_available = model_files.get(selected_model, False)
 
         # Upload photo
@@ -236,7 +236,11 @@ with tab_home:
 
     with col_right:
         if not model_available:
-            st.warning(f"⚠️ {selected_model} model is not trained yet. Please select CNN model.")
+            available_models = [name for name, ok in model_files.items() if ok]
+            if available_models:
+                st.warning(f"⚠️ {selected_model} model is not trained yet. Please select one of: {', '.join(available_models)}.")
+            else:
+                st.warning(f"⚠️ {selected_model} model is not trained yet, and no other model files were found either.")
         elif image is None:
             st.info("📷 Please upload an image or take a photo")
         elif not detect_clicked:
