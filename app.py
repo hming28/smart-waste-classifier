@@ -19,7 +19,7 @@ CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 
 # Model config
 MODELS = {
-    "CNN": "cnn_garbage_classifier_4class.h5",
+    "CNN": "AdvancedCNN_none_classweightv1.keras",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
 }
