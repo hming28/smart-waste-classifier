@@ -243,11 +243,16 @@ with tab_home:
             # Run prediction
             model = load_model(MODELS[selected_model])
 
-            img_resized = image.resize((224, 224))
-            img_array = np.array(img_resized).astype(np.float32)
-            img_array = np.expand_dims(img_array, axis=0)
-            # Use this model's own preprocessing — not a shared /255.0 for everything
-            img_array = PREPROCESS_FUNCS[selected_model](img_array)
+            img_array = np.array(image.convert("RGB"))
+
+            if selected_model == "MobileNetV2":
+                img_array = crop_then_preprocess_input(img_array)
+                img_array = np.expand_dims(img_array, axis=0)
+            else:
+                img_resized = image.resize((224, 224))
+                img_array = np.array(img_resized).astype(np.float32)
+                img_array = np.expand_dims(img_array, axis=0)
+                img_array = PREPROCESS_FUNCS[selected_model](img_array)
 
             with st.spinner(f"AI Detecting with {selected_model}..."):
                 predictions = predict_with_model(model, img_array)
