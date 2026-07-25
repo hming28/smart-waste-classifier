@@ -44,7 +44,7 @@ PREPROCESS_FUNCS = {
 # ---------------------------------------------------------------------------
 IMAGE_PROCESSING = {
     "CNN": "A",
-    "MobileNetV2": "A",   # change to "B" only once the .keras file above is the Method-B-trained checkpoint
+    "MobileNetV2": "B",   # change to "B" only once the .keras file above is the Method-B-trained checkpoint
     "ResNet50": "A",
 }
 
