@@ -1,4 +1,5 @@
 import os
+import cv2
 import streamlit as st
 import numpy as np
 from PIL import Image
@@ -29,6 +30,57 @@ PREPROCESS_FUNCS = {
     "MobileNetV2": mobilenet_preprocess,          # scales to [-1, 1]
     "ResNet50": resnet_preprocess,                # ImageNet mean-subtraction
 }
+
+# ---------------------------------------------------------------------------
+# Image treatment pipeline (A = original, B = object crop, C = background removal).
+#
+# CRITICAL: this must match whatever pipeline actually produced the model file
+# listed in MODELS above — not what you *wish* it were trained with. Applying
+# crop/background-removal to a model that was trained on plain Method-A images
+# creates a NEW train/inference mismatch, the same bug this config exists to fix.
+#
+# Update the value here ONLY when you swap in a model file that was actually
+# retrained on that treatment's processed images.
+# ---------------------------------------------------------------------------
+IMAGE_PROCESSING = {
+    "CNN": "A",
+    "MobileNetV2": "A",   # change to "B" only once the .keras file above is the Method-B-trained checkpoint
+    "ResNet50": "A",
+}
+
+
+def crop_with_margin(img_array: np.ndarray, margin_ratio: float = 0.1) -> np.ndarray:
+    """Crop tightly around the main object (Otsu threshold + largest contour),
+    with a margin so the object edge isn't cut off. Falls back to the original
+    image if no contour is found, so a bad photo never crashes the app."""
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if not contours:
+        return img_array
+
+    largest = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(largest)
+
+    mx, my = int(w * margin_ratio), int(h * margin_ratio)
+    x1, y1 = max(0, x - mx), max(0, y - my)
+    x2, y2 = min(img_array.shape[1], x + w + mx), min(img_array.shape[0], y + h + my)
+
+    cropped = img_array[y1:y2, x1:x2]
+    return cropped if cropped.size > 0 else img_array
+
+
+def apply_image_processing(img_array: np.ndarray, mode: str) -> np.ndarray:
+    """Route to the treatment this specific model was actually trained with."""
+    if mode == "B":
+        return crop_with_margin(img_array)
+    if mode == "C":
+        # Not wired up yet — implement once a Method-C-trained model file exists,
+        # using the same rembg + neutral-background logic as the training notebook.
+        raise NotImplementedError("Method C (background removal) isn't available yet.")
+    return img_array  # Method A — no change
 
 # Recycling info
 RECYCLE_INFO = {
@@ -207,7 +259,7 @@ with tab_home:
             default="ResNet50",
         )
 
-        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "CNN"
+        selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "ResNet50"
         model_available = model_files.get(selected_model, False)
 
         # Upload photo
@@ -243,16 +295,17 @@ with tab_home:
             # Run prediction
             model = load_model(MODELS[selected_model])
 
+            # Step 1: apply whichever image treatment this model was actually trained with
             img_array = np.array(image.convert("RGB"))
+            mode = IMAGE_PROCESSING.get(selected_model, "A")
+            img_array = apply_image_processing(img_array, mode)
 
-            if selected_model == "MobileNetV2":
-                img_array = crop_then_preprocess_input(img_array)
-                img_array = np.expand_dims(img_array, axis=0)
-            else:
-                img_resized = image.resize((224, 224))
-                img_array = np.array(img_resized).astype(np.float32)
-                img_array = np.expand_dims(img_array, axis=0)
-                img_array = PREPROCESS_FUNCS[selected_model](img_array)
+            # Step 2: resize to model input size
+            img_array = cv2.resize(img_array, (224, 224)).astype(np.float32)
+            img_array = np.expand_dims(img_array, axis=0)
+
+            # Step 3: use this model's own normalization — not a shared /255.0 for everything
+            img_array = PREPROCESS_FUNCS[selected_model](img_array)
 
             with st.spinner(f"AI Detecting with {selected_model}..."):
                 predictions = predict_with_model(model, img_array)
