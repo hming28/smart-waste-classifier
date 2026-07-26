@@ -380,6 +380,3 @@ with tab_about:
     ### Team
     Built for AI Course Assignment
     """)
-
-predictions = predict_with_model(model, img_array)
-st.write(predictions[0])   # 加这一行，看四个类的具体概率
