@@ -301,7 +301,7 @@ with tab_home:
             img_array = apply_image_processing(img_array, mode)
 
             # Step 2: resize to model input size
-            img_array = cv2.resize(img_array, (224, 224)).astype(np.float32)
+            img_array = cv2.resize(img_array, (224, 224), interpolation=cv2.INTER_NEAREST).astype(np.float32)
             img_array = np.expand_dims(img_array, axis=0)
 
             # Step 3: use this model's own normalization — not a shared /255.0 for everything
