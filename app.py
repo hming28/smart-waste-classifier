@@ -44,43 +44,85 @@ PREPROCESS_FUNCS = {
 # ---------------------------------------------------------------------------
 IMAGE_PROCESSING = {
     "CNN": "A",
-    "MobileNetV2": "A",   # change to "B" only once the .keras file above is the Method-B-trained checkpoint
+    "MobileNetV2": "B",   # confirmed: mobilenetv2_garbage_classifier_4class.keras on this
+                           # branch is the Method-B (object-crop) checkpoint from
+                           # v2_5_mobilenetv2_object_crop.ipynb — test accuracy 92.90%
     "ResNet50": "A",
 }
 
 
-def crop_with_margin(img_array: np.ndarray, margin_ratio: float = 0.1) -> np.ndarray:
-    """Crop tightly around the main object (Otsu threshold + largest contour),
-    with a margin so the object edge isn't cut off. Falls back to the original
-    image if no contour is found, so a bad photo never crashes the app."""
-    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+def crop_with_margin_array(img_arr: np.ndarray, margin_ratio: float = 0.10) -> np.ndarray:
+    """Exact port of crop_with_margin_array() from
+    v2_5_mobilenetv2_object_crop.ipynb (the function actually wired into
+    crop_then_preprocess_input / the training ImageDataGenerator — NOT the
+    simpler demo-only crop shown in that notebook's Step 4b visualization cell).
+
+    Do not simplify this — the morphology open/close and the min-size guard
+    are part of what the deployed .keras file was actually trained on."""
+    if img_arr.dtype != np.uint8:
+        img_arr = np.clip(img_arr, 0, 255).astype(np.uint8)
+
+    gray = cv2.cvtColor(img_arr, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    kernel = np.ones((5, 5), np.uint8)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        return img_array
+        return img_arr
 
     largest = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(largest)
 
+    if w < 5 or h < 5:
+        return img_arr
+
     mx, my = int(w * margin_ratio), int(h * margin_ratio)
     x1, y1 = max(0, x - mx), max(0, y - my)
-    x2, y2 = min(img_array.shape[1], x + w + mx), min(img_array.shape[0], y + h + my)
+    x2, y2 = min(img_arr.shape[1], x + w + mx), min(img_arr.shape[0], y + h + my)
 
-    cropped = img_array[y1:y2, x1:x2]
-    return cropped if cropped.size > 0 else img_array
+    if x2 <= x1 or y2 <= y1:
+        return img_arr
+
+    return img_arr[y1:y2, x1:x2]
 
 
-def apply_image_processing(img_array: np.ndarray, mode: str) -> np.ndarray:
-    """Route to the treatment this specific model was actually trained with."""
+def preprocess_image(pil_image: Image.Image, mode: str) -> np.ndarray:
+    """Reproduce, pixel-pipeline-for-pixel-pipeline, whatever this model's
+    checkpoint was actually trained with. Returns a float32 (224, 224, 3)
+    array — normalization (preprocess_input) is applied separately afterward.
+
+    Method A (no treatment) — matches ImageDataGenerator's default
+    target_size loading used for CNN / ResNet50 / MobileNetV2-A:
+        resize original photo -> 224x224 (nearest)
+
+    Method B (object crop) — matches crop_then_preprocess_input() in
+    v2_5_mobilenetv2_object_crop.ipynb EXACTLY, including the order:
+        1) resize original photo -> 224x224 (nearest)   <- this is the array
+           Keras' target_size loading actually handed to the
+           preprocessing_function during training, NOT the original
+           full-resolution photo. Cropping the original-resolution photo
+           directly (the old bug) is a different pipeline than training saw.
+        2) crop_with_margin_array() on THAT 224x224 image (Otsu + morphology)
+        3) resize the (usually smaller) crop back up to 224x224 (INTER_AREA,
+           matching cv2.resize(..., interpolation=cv2.INTER_AREA) in training)
+    """
+    arr = np.array(pil_image.convert("RGB"))
+    arr = cv2.resize(arr, (224, 224), interpolation=cv2.INTER_NEAREST)
+
     if mode == "B":
-        return crop_with_margin(img_array)
-    if mode == "C":
+        arr = crop_with_margin_array(arr, margin_ratio=0.10)
+        arr = cv2.resize(arr, (224, 224), interpolation=cv2.INTER_AREA)
+    elif mode == "C":
         # Not wired up yet — implement once a Method-C-trained model file exists,
         # using the same rembg + neutral-background logic as the training notebook.
         raise NotImplementedError("Method C (background removal) isn't available yet.")
-    return img_array  # Method A — no change
+    # mode == "A": no further change beyond the initial resize
+
+    return arr.astype(np.float32)
 
 # Recycling info
 RECYCLE_INFO = {
@@ -295,13 +337,10 @@ with tab_home:
             # Run prediction
             model = load_model(MODELS[selected_model])
 
-            # Step 1: apply whichever image treatment this model was actually trained with
-            img_array = np.array(image.convert("RGB"))
+            # Step 1+2: reproduce this model's exact training-time pipeline
+            # (resize -> [crop for Method B] -> resize), NOT resize-then-crop-once.
             mode = IMAGE_PROCESSING.get(selected_model, "A")
-            img_array = apply_image_processing(img_array, mode)
-
-            # Step 2: resize to model input size
-            img_array = cv2.resize(img_array, (224, 224), interpolation=cv2.INTER_NEAREST).astype(np.float32)
+            img_array = preprocess_image(image, mode)
             img_array = np.expand_dims(img_array, axis=0)
 
             # Step 3: use this model's own normalization — not a shared /255.0 for everything
