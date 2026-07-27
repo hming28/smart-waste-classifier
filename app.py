@@ -348,7 +348,6 @@ with tab_home:
 
             with st.spinner(f"AI Detecting with {selected_model}..."):
                 predictions = predict_with_model(model, img_array)
-                st.write(predictions[0])
                 pred_index = np.argmax(predictions[0])
                 pred_class = CLASS_NAMES[pred_index]
                 confidence = float(predictions[0][pred_index]) * 100
