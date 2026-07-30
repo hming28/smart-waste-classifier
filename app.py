@@ -44,7 +44,7 @@ PREPROCESS_FUNCS = {
 # ---------------------------------------------------------------------------
 IMAGE_PROCESSING = {
     "CNN": "A",
-    "MobileNetV2": "B",   # confirmed: mobilenetv2_garbage_classifier_4class.keras on this
+    "MobileNetV2": "A",   # confirmed: mobilenetv2_garbage_classifier_4class.keras on this
                            # branch is the Method-B (object-crop) checkpoint from
                            # v2_5_mobilenetv2_object_crop.ipynb — test accuracy 92.90%
     "ResNet50": "A",
