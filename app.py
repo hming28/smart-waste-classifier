@@ -17,18 +17,40 @@ st.set_page_config(
 # Class names — all models output in alphabetical order: glass, metal, paper, plastic
 CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 
+# CLIP is zero-shot (no local checkpoint file) — it's downloaded from the
+# HuggingFace Hub by name, matching 01_CLIP_ZeroShot.ipynb exactly.
+CLIP_MODEL_NAME = "openai/clip-vit-base-patch32"
+
 # Model config
+# NOTE: CLIP's "path" is a Hub model name, not a local file — it is handled as a
+# special case everywhere MODELS is used for file existence / os.path.exists.
 MODELS = {
     "CNN": "AdvancedCNN_none_classweight.keras",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
+    "CLIP (zero-shot)": CLIP_MODEL_NAME,
 }
+
+# Models that are downloaded from the HuggingFace Hub rather than loaded from a
+# local checkpoint file. Used to skip the os.path.exists() file check.
+HUB_MODELS = {"CLIP (zero-shot)"}
 
 # Each model was trained with a different input normalization
 PREPROCESS_FUNCS = {
     "CNN": lambda arr: arr / 255.0,              # AdvancedCNN: rescale=1./255
     "MobileNetV2": mobilenet_preprocess,          # scales to [-1, 1]
     "ResNet50": resnet_preprocess,                # ImageNet mean-subtraction
+    # CLIP has no entry here — CLIPProcessor does its own resize/normalize
+    # internally (see predict_clip below), so none of this pipeline applies.
+}
+
+# Descriptive zero-shot prompts — exact match to 01_CLIP_ZeroShot.ipynb Section 5.
+# CLIP is prompt-sensitive; plain class names score noticeably worse than these.
+CLIP_PROMPTS = {
+    "glass":   "a photo of a glass bottle or glass container",
+    "metal":   "a photo of a metal can or aluminum can",
+    "paper":   "a photo of paper or cardboard",
+    "plastic": "a photo of a plastic bottle or plastic container",
 }
 
 # ---------------------------------------------------------------------------
@@ -48,6 +70,10 @@ IMAGE_PROCESSING = {
                            # branch is the Method-B (object-crop) checkpoint from
                            # v2_5_mobilenetv2_object_crop.ipynb — test accuracy 92.90%
     "ResNet50": "A",
+    # CLIP (zero-shot): intentionally NOT listed here. CLIPProcessor does its own
+    # resize + normalization from the raw PIL image, so applying Method A/B crop
+    # logic before it would just be an unnecessary extra resize, not a training-
+    # pipeline match (there is no CLIP training pipeline — it's zero-shot).
 }
 
 
@@ -159,6 +185,10 @@ RECYCLE_INFO = {
 
 # Load model with compatibility fix
 def load_model_compat(path):
+    # CLIP: Hub model name, not a local file — route to the CLIP loader
+    if path == CLIP_MODEL_NAME:
+        return load_clip_model()
+
     # .tflite files use TFLite interpreter
     if path.endswith(".tflite"):
         interpreter = tf.lite.Interpreter(model_path=path)
@@ -194,6 +224,46 @@ def load_model_compat(path):
     model = tf.keras.models.load_model(tmp, compile=False)
     os.remove(tmp)
     return model
+
+
+def load_clip_model():
+    """Load CLIP exactly as in 01_CLIP_ZeroShot.ipynb Section 4 — same model name,
+    same eval() mode, same device selection. Returns a small bundle dict instead of
+    a bare model since predict_clip() also needs the processor + device."""
+    import torch
+    from transformers import CLIPModel, CLIPProcessor
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = CLIPModel.from_pretrained(CLIP_MODEL_NAME).to(device)
+    processor = CLIPProcessor.from_pretrained(CLIP_MODEL_NAME)
+    model.eval()
+    return {"model": model, "processor": processor, "device": device}
+
+
+def predict_clip(clip_bundle: dict, pil_image: Image.Image) -> np.ndarray:
+    """Zero-shot CLIP inference — mirrors 01_CLIP_ZeroShot.ipynb Section 6 exactly:
+    same descriptive prompts, same logits_per_image softmax. Takes the raw PIL
+    image directly; CLIPProcessor handles its own resize/normalize, so none of
+    preprocess_image() / PREPROCESS_FUNCS applies here.
+
+    Returns an array shaped (1, 4) in CLASS_NAMES order, so it drops straight into
+    the same argmax / confidence / progress-bar code the TF models already use."""
+    import torch
+
+    model = clip_bundle["model"]
+    processor = clip_bundle["processor"]
+    device = clip_bundle["device"]
+
+    text_labels = [CLIP_PROMPTS[c] for c in CLASS_NAMES]
+
+    with torch.no_grad():
+        inputs = processor(
+            text=text_labels, images=[pil_image], return_tensors="pt", padding=True
+        ).to(device)
+        outputs = model(**inputs)
+        probs = outputs.logits_per_image.softmax(dim=1).cpu().numpy()
+
+    return probs
 
 
 def predict_with_model(model, img_array):
@@ -287,7 +357,17 @@ with tab_home:
         model_labels = []
         model_files = {}
         for name, filename in MODELS.items():
-            available = os.path.exists(filename)
+            if name in HUB_MODELS:
+                # CLIP has no local checkpoint — it's "available" if the
+                # torch/transformers packages are installed, not a file check.
+                try:
+                    import torch as _torch_check  # noqa: F401
+                    import transformers as _transformers_check  # noqa: F401
+                    available = True
+                except ImportError:
+                    available = False
+            else:
+                available = os.path.exists(filename)
             model_files[name] = available
             if available:
                 model_labels.append(name)
@@ -337,20 +417,30 @@ with tab_home:
             # Run prediction
             model = load_model(MODELS[selected_model])
 
-            # Step 1+2: reproduce this model's exact training-time pipeline
-            # (resize -> [crop for Method B] -> resize), NOT resize-then-crop-once.
-            mode = IMAGE_PROCESSING.get(selected_model, "A")
-            img_array = preprocess_image(image, mode)
-            img_array = np.expand_dims(img_array, axis=0)
+            if selected_model in HUB_MODELS:
+                # CLIP (zero-shot): no crop/resize pipeline, no train-time
+                # normalization — CLIPProcessor takes the raw image directly and
+                # scores it against text prompts (see predict_clip above).
+                with st.spinner(f"AI Detecting with {selected_model}..."):
+                    predictions = predict_clip(model, image)
+                    pred_index = np.argmax(predictions[0])
+                    pred_class = CLASS_NAMES[pred_index]
+                    confidence = float(predictions[0][pred_index]) * 100
+            else:
+                # Step 1+2: reproduce this model's exact training-time pipeline
+                # (resize -> [crop for Method B] -> resize), NOT resize-then-crop-once.
+                mode = IMAGE_PROCESSING.get(selected_model, "A")
+                img_array = preprocess_image(image, mode)
+                img_array = np.expand_dims(img_array, axis=0)
 
-            # Step 3: use this model's own normalization — not a shared /255.0 for everything
-            img_array = PREPROCESS_FUNCS[selected_model](img_array)
+                # Step 3: use this model's own normalization — not a shared /255.0 for everything
+                img_array = PREPROCESS_FUNCS[selected_model](img_array)
 
-            with st.spinner(f"AI Detecting with {selected_model}..."):
-                predictions = predict_with_model(model, img_array)
-                pred_index = np.argmax(predictions[0])
-                pred_class = CLASS_NAMES[pred_index]
-                confidence = float(predictions[0][pred_index]) * 100
+                with st.spinner(f"AI Detecting with {selected_model}..."):
+                    predictions = predict_with_model(model, img_array)
+                    pred_index = np.argmax(predictions[0])
+                    pred_class = CLASS_NAMES[pred_index]
+                    confidence = float(predictions[0][pred_index]) * 100
 
             info = RECYCLE_INFO[pred_class]
 
@@ -407,6 +497,7 @@ with tab_about:
     | CNN | ✅ Available |
     | MobileNetV2 | ✅ Available |
     | ResNet50 | ✅ Available |
+    | CLIP (zero-shot) | ✅ Available — no training, baseline comparison |
 
     ### Supported Waste Types
     | Category | Examples |
