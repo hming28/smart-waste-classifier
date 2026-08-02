@@ -42,6 +42,14 @@ MODELS = {
 # local checkpoint file. Used to skip the os.path.exists() file check.
 HUB_MODELS = {"CLIP (zero-shot)"}
 
+# CLIP Verify: an optional per-model toggle for CNN/MobileNetV2/ResNet50 that
+# double-checks low-confidence predictions using CLIP Linear Probe (needs the
+# small trained head saved from 02_CLIP_LinearProbe.ipynb, NOT zero-shot —
+# Linear Probe is meaningfully more accurate, 90.65% vs 86.86%).
+CLIP_LINEAR_PROBE_FILENAME = "clip_linear_probe.pt"
+CLIP_VERIFY_MODELS = {"CNN", "MobileNetV2", "ResNet50"}
+CLIP_VERIFY_DEFAULT_THRESHOLD = 0.90
+
 # Models that need a local .keras/.tflite file AND CLIP loaded live (both frameworks
 # resident in memory at once — the heaviest combination in this app by far).
 FUSION_MODELS = {"Feature Fusion (ResNet50+CLIP)"}
@@ -353,6 +361,62 @@ def predict_fusion(bundle: dict, pil_image: Image.Image) -> np.ndarray:
     return predictions
 
 
+def load_clip_verify_bundle():
+    """CLIP Verify helper: frozen CLIP encoder + a small trained Linear Probe
+    head (512 -> 4), used to double-check CNN/MobileNetV2/ResNet50 predictions
+    when their own confidence is low. Mirrors 02_CLIP_LinearProbe.ipynb.
+
+    ⚠️ Be upfront about this, including in the UI: a threshold-gated version of
+    this was tested empirically on the 845-image shared test split and did NOT
+    beat ResNet50 alone (best test-set-searched threshold got 96.80%, vs.
+    96.92% for ResNet50 alone — worse, not better). ResNet50's confidence is
+    often still high even when wrong (mean 0.86 even on wrong predictions), so
+    a simple confidence cutoff can't cleanly separate "trust me" from "ask
+    CLIP" on these clean, studio-style dataset photos. This toggle exists for
+    experimentation and for real-world / out-of-distribution photos, where the
+    effect is untested and may differ — not because it's confirmed to help on
+    the benchmark images the model was graded on."""
+    import torch
+    import torch.nn as nn
+
+    class LinearProbeHead(nn.Module):
+        def __init__(self, in_dim=512, n_classes=4):
+            super().__init__()
+            self.fc = nn.Linear(in_dim, n_classes)
+
+        def forward(self, x):
+            return self.fc(x)
+
+    clip_bundle = load_clip_model()
+    device = clip_bundle["device"]
+
+    probe = LinearProbeHead().to(device)
+    probe.load_state_dict(torch.load(CLIP_LINEAR_PROBE_FILENAME, map_location=device))
+    probe.eval()
+
+    return {"clip": clip_bundle, "probe": probe}
+
+
+def predict_clip_verify(bundle: dict, pil_image: Image.Image) -> np.ndarray:
+    """CLIP Linear Probe inference — frozen CLIP feature -> trained Linear
+    layer -> softmax. Same math as 02_CLIP_LinearProbe.ipynb Section 7.
+    Returns (1, 4) in CLASS_NAMES order."""
+    import torch
+
+    clip_bundle = bundle["clip"]
+    probe = bundle["probe"]
+    device = clip_bundle["device"]
+
+    clip_feature = get_clip_feature(clip_bundle, pil_image)  # (1, 512) numpy, frozen CLIP
+
+    with torch.no_grad():
+        feat_tensor = torch.tensor(clip_feature, dtype=torch.float32).to(device)
+        logits = probe(feat_tensor)
+        probs = torch.softmax(logits, dim=1).cpu().numpy()
+
+    return probs
+
+
 def predict_with_model(model, img_array):
     # TFLite interpreter
     if isinstance(model, tf.lite.Interpreter):
@@ -373,6 +437,11 @@ def predict_with_model(model, img_array):
 @st.cache_resource
 def load_model(path):
     return load_model_compat(path)
+
+
+@st.cache_resource
+def get_clip_verify_bundle():
+    return load_clip_verify_bundle()
 
 
 # Custom CSS
@@ -479,6 +548,31 @@ with tab_home:
         selected_model = selected_model_label.replace(" (Not trained)", "") if selected_model_label else "ResNet50"
         model_available = model_files.get(selected_model, False)
 
+        # CLIP Verify toggle — only offered for CNN/MobileNetV2/ResNet50 (CLIP
+        # zero-shot and Feature Fusion already are/include CLIP, no point toggling)
+        use_clip_verify = False
+        clip_verify_threshold = CLIP_VERIFY_DEFAULT_THRESHOLD
+        clip_verify_available = os.path.exists(CLIP_LINEAR_PROBE_FILENAME) and model_files.get("CLIP (zero-shot)", False)
+
+        if selected_model in CLIP_VERIFY_MODELS:
+            if clip_verify_available:
+                use_clip_verify = st.toggle(
+                    "🔍 CLIP Verify",
+                    help="When ON, low-confidence predictions get double-checked by CLIP "
+                         "Linear Probe. Tested on the benchmark test set this did NOT "
+                         "improve accuracy (confidence isn't a reliable signal for this "
+                         "model) — provided for experimentation, especially on real-world "
+                         "photos the model wasn't trained on.",
+                )
+                if use_clip_verify:
+                    clip_verify_threshold = st.slider(
+                        "Verify below this confidence",
+                        min_value=0.50, max_value=1.00,
+                        value=CLIP_VERIFY_DEFAULT_THRESHOLD, step=0.01,
+                    )
+            else:
+                st.caption("⚠️ CLIP Verify unavailable — missing `clip_linear_probe.pt` or CLIP dependencies.")
+
         # Upload photo
         uploaded_file = st.file_uploader(
             "Upload a photo of waste",
@@ -545,6 +639,23 @@ with tab_home:
                     pred_class = CLASS_NAMES[pred_index]
                     confidence = float(predictions[0][pred_index]) * 100
 
+                # CLIP Verify: only kicks in if the toggle is on AND this
+                # prediction's own confidence fell below the chosen threshold.
+                # See load_clip_verify_bundle()'s docstring — this is NOT
+                # confirmed to improve accuracy on the benchmark test images.
+                if use_clip_verify and (confidence / 100.0) < clip_verify_threshold:
+                    verify_bundle = get_clip_verify_bundle()
+                    with st.spinner("Confidence low — verifying with CLIP..."):
+                        clip_predictions = predict_clip_verify(verify_bundle, image)
+                        predictions = clip_predictions
+                        pred_index = np.argmax(predictions[0])
+                        pred_class = CLASS_NAMES[pred_index]
+                        confidence = float(predictions[0][pred_index]) * 100
+                    st.caption(f"🔍 {selected_model}'s confidence was below "
+                               f"{clip_verify_threshold*100:.0f}% — final answer verified/overridden by CLIP.")
+                elif use_clip_verify:
+                    st.caption(f"✅ {selected_model} was confident enough — used directly, CLIP not consulted.")
+
             info = RECYCLE_INFO[pred_class]
 
             # Prediction card
@@ -602,6 +713,11 @@ with tab_about:
     | ResNet50 | ✅ Available |
     | CLIP (zero-shot) | ✅ Available — no training, baseline comparison |
     | Feature Fusion (ResNet50+CLIP) | ✅ Available — dual-branch trained framework, 97.04% test accuracy |
+
+    **CLIP Verify** (optional toggle for CNN/MobileNetV2/ResNet50): double-checks
+    low-confidence predictions using CLIP Linear Probe. ⚠️ Tested on the benchmark
+    test set, this did *not* improve accuracy — provided for experimentation on
+    real-world photos instead.
 
     ### Supported Waste Types
     | Category | Examples |
