@@ -21,6 +21,12 @@ CLASS_NAMES = ["glass", "metal", "paper", "plastic"]
 # HuggingFace Hub by name, matching 01_CLIP_ZeroShot.ipynb exactly.
 CLIP_MODEL_NAME = "openai/clip-vit-base-patch32"
 
+# Feature Fusion needs a local .tflite file (converted from 03_Feature_Fusion.ipynb's
+# .keras output) — place it in the same directory as this app. It's a dual-input
+# model (image + CLIP feature), so it ALSO needs CLIP loaded live at inference time
+# (see FUSION_MODELS handling below).
+FUSION_MODEL_FILENAME = "resnet50_clip_fusion_final.tflite"
+
 # Model config
 # NOTE: CLIP's "path" is a Hub model name, not a local file — it is handled as a
 # special case everywhere MODELS is used for file existence / os.path.exists.
@@ -29,11 +35,16 @@ MODELS = {
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
     "CLIP (zero-shot)": CLIP_MODEL_NAME,
+    "Feature Fusion (ResNet50+CLIP)": FUSION_MODEL_FILENAME,
 }
 
 # Models that are downloaded from the HuggingFace Hub rather than loaded from a
 # local checkpoint file. Used to skip the os.path.exists() file check.
 HUB_MODELS = {"CLIP (zero-shot)"}
+
+# Models that need a local .keras/.tflite file AND CLIP loaded live (both frameworks
+# resident in memory at once — the heaviest combination in this app by far).
+FUSION_MODELS = {"Feature Fusion (ResNet50+CLIP)"}
 
 # Each model was trained with a different input normalization
 PREPROCESS_FUNCS = {
@@ -189,6 +200,10 @@ def load_model_compat(path):
     if path == CLIP_MODEL_NAME:
         return load_clip_model()
 
+    # Feature Fusion: needs the local .keras file AND a live CLIP encoder
+    if path == FUSION_MODEL_FILENAME:
+        return load_fusion_model()
+
     # .tflite files use TFLite interpreter
     if path.endswith(".tflite"):
         interpreter = tf.lite.Interpreter(model_path=path)
@@ -264,6 +279,78 @@ def predict_clip(clip_bundle: dict, pil_image: Image.Image) -> np.ndarray:
         probs = outputs.logits_per_image.softmax(dim=1).cpu().numpy()
 
     return probs
+
+
+def load_fusion_model():
+    """Load BOTH halves the Feature Fusion model needs: the trained dual-input
+    TFLite interpreter (quantized, ~24MB vs the original 200MB .keras — same
+    dynamic-range quantization used for the standalone ResNet50 model), and a
+    frozen CLIP encoder (to compute the 512-d feature its second input branch
+    expects). Mirrors 03_Feature_Fusion.ipynb Section 6.
+
+    This is still the heaviest load in the app — full ResNet50 backbone (via the
+    fusion model) + full CLIP (PyTorch) resident in memory at the same time, for
+    as long as this model stays selected — quantizing the .tflite only shrinks
+    the on-disk/weight footprint, not the fact that two frameworks run together."""
+    interpreter = tf.lite.Interpreter(model_path=FUSION_MODEL_FILENAME)
+    interpreter.allocate_tensors()
+    clip_bundle = load_clip_model()
+    return {"interpreter": interpreter, "clip": clip_bundle}
+
+
+def get_clip_feature(clip_bundle: dict, pil_image: Image.Image) -> np.ndarray:
+    """Frozen CLIP image EMBEDDING (512-d, L2-normalized) — NOT zero-shot
+    classification against text prompts. Same extraction used to build the
+    training features in 02_CLIP_LinearProbe.ipynb / 03_Feature_Fusion.ipynb:
+    vision_model -> visual_projection -> L2 normalize (bypasses the
+    get_image_features() wrapper — see those notebooks for why)."""
+    import torch
+
+    model = clip_bundle["model"]
+    processor = clip_bundle["processor"]
+    device = clip_bundle["device"]
+
+    with torch.no_grad():
+        inputs = processor(images=[pil_image], return_tensors="pt").to(device)
+        vision_outputs = model.vision_model(pixel_values=inputs["pixel_values"])
+        pooled_output = vision_outputs.pooler_output
+        feats = model.visual_projection(pooled_output)
+        feats = feats / feats.norm(dim=-1, keepdim=True)
+
+    return feats.cpu().numpy()  # shape (1, 512)
+
+
+def predict_fusion(bundle: dict, pil_image: Image.Image) -> np.ndarray:
+    """Dual-branch inference, mirroring 03_Feature_Fusion.ipynb exactly:
+    - ResNet50 branch: plain resize (Method A) + resnet50.preprocess_input,
+      same pipeline as the standalone ResNet50 model above.
+    - CLIP branch: frozen 512-d feature from get_clip_feature() above.
+    Both feed into the trained fusion head via the TFLite interpreter. Tensors
+    are matched by NAME, not fixed index — TFLite conversion doesn't guarantee
+    input_details order matches the original Keras model's input list order
+    (confirmed: this file lists clip_feature at index 0, image at index 1).
+    Returns (1, 4) in CLASS_NAMES order, same as every other model's predictions."""
+    interpreter = bundle["interpreter"]
+    clip_bundle = bundle["clip"]
+
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    img_array = preprocess_image(pil_image, "A")
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array = resnet_preprocess(img_array).astype(np.float32)
+
+    clip_feature = get_clip_feature(clip_bundle, pil_image).astype(np.float32)
+
+    for detail in input_details:
+        if "image" in detail["name"]:
+            interpreter.set_tensor(detail["index"], img_array)
+        elif "clip_feature" in detail["name"]:
+            interpreter.set_tensor(detail["index"], clip_feature)
+
+    interpreter.invoke()
+    predictions = interpreter.get_tensor(output_details[0]["index"])
+    return predictions
 
 
 def predict_with_model(model, img_array):
@@ -366,6 +453,14 @@ with tab_home:
                     available = True
                 except ImportError:
                     available = False
+            elif name in FUSION_MODELS:
+                # Needs BOTH the local .keras file AND torch/transformers installed.
+                try:
+                    import torch as _torch_check  # noqa: F401
+                    import transformers as _transformers_check  # noqa: F401
+                    available = os.path.exists(filename)
+                except ImportError:
+                    available = False
             else:
                 available = os.path.exists(filename)
             model_files[name] = available
@@ -423,6 +518,14 @@ with tab_home:
                 # scores it against text prompts (see predict_clip above).
                 with st.spinner(f"AI Detecting with {selected_model}..."):
                     predictions = predict_clip(model, image)
+                    pred_index = np.argmax(predictions[0])
+                    pred_class = CLASS_NAMES[pred_index]
+                    confidence = float(predictions[0][pred_index]) * 100
+            elif selected_model in FUSION_MODELS:
+                # Dual-branch: ResNet50-style preprocessing for the image input,
+                # plus a live CLIP feature for the second input (see predict_fusion).
+                with st.spinner(f"AI Detecting with {selected_model}..."):
+                    predictions = predict_fusion(model, image)
                     pred_index = np.argmax(predictions[0])
                     pred_class = CLASS_NAMES[pred_index]
                     confidence = float(predictions[0][pred_index]) * 100
@@ -498,6 +601,7 @@ with tab_about:
     | MobileNetV2 | ✅ Available |
     | ResNet50 | ✅ Available |
     | CLIP (zero-shot) | ✅ Available — no training, baseline comparison |
+    | Feature Fusion (ResNet50+CLIP) | ✅ Available — dual-branch trained framework, 97.04% test accuracy |
 
     ### Supported Waste Types
     | Category | Examples |
