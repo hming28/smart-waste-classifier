@@ -1,5 +1,5 @@
 {
-  "_readme": "Every number here comes from evaluating the ACTUAL deployed file in this repo (not an earlier/different checkpoint) on the same shared 845-image test split. Regenerate this file if any model file is retrained/replaced.",
+  "_readme": "Every number here comes from evaluating the ACTUAL deployed file in this repo (not an earlier/different checkpoint) on the same shared 845-image test split. CNN/MobileNetV2/ResNet50/Feature Fusion numbers were cross-verified two ways: (1) each notebook's own classification_report() on load, and (2) independently recomputed from real per-image prediction CSVs in 04_Visualize_result_model.ipynb. Both agree exactly. Regenerate this file if any model file is retrained/replaced.",
   "test_set_size": 845,
   "class_names": ["glass", "metal", "paper", "plastic"],
   "models": {
@@ -13,7 +13,7 @@
         "paper":   {"precision": 0.9427, "recall": 0.9537, "f1": 0.9482, "support": 259},
         "plastic": {"precision": 0.8803, "recall": 0.8879, "f1": 0.8841, "support": 232}
       },
-      "source": "stb_v2_ADV_CNN_4class_Comparison.ipynb — final cell, loads AdvancedCNN_none_classweight.keras directly and evaluates on test_split.csv"
+      "source": "stb_v2_ADV_CNN_4class_Comparison.ipynb final cell (loads AdvancedCNN_none_classweight.keras, evaluates on test_split.csv); cross-verified from cnn_predictions.csv in 04_Visualize_result_model.ipynb"
     },
     "MobileNetV2": {
       "file": "mobilenetv2_garbage_classifier_4class.keras",
@@ -25,7 +25,7 @@
         "paper":   {"precision": 0.9509, "recall": 0.9730, "f1": 0.9618, "support": 259},
         "plastic": {"precision": 0.8870, "recall": 0.9138, "f1": 0.9002, "support": 232}
       },
-      "source": "stb_v2_mobilenetv2.ipynb — final cell, downloads the deployed mobilenetv2_model.keras from Drive and evaluates on test_split.csv"
+      "source": "stb_v2_mobilenetv2.ipynb final cell (downloads deployed mobilenetv2_model.keras from Drive, evaluates on test_split.csv); cross-verified from mobilenetv2_predictions.csv in 04_Visualize_result_model.ipynb"
     },
     "ResNet50": {
       "file": "resnet50_model_quantized.tflite",
@@ -37,7 +37,7 @@
         "paper":   {"precision": 0.9846, "recall": 0.9884, "f1": 0.9865, "support": 259},
         "plastic": {"precision": 0.9652, "recall": 0.9569, "f1": 0.9610, "support": 232}
       },
-      "source": "stb_v2_resnet50_garbage_classification.ipynb — final cell, downloads the deployed resnet50_model_quantized.tflite from Drive and evaluates on test_split.csv"
+      "source": "stb_v2_resnet50_garbage_classification.ipynb final cell (downloads deployed resnet50_model_quantized.tflite from Drive, evaluates on test_split.csv); cross-verified from resnet50_predictions.csv in 04_Visualize_result_model.ipynb"
     },
     "Feature Fusion (ResNet50+CLIP)": {
       "file": "resnet50_clip_fusion_final.tflite",
@@ -49,7 +49,28 @@
         "paper":   {"precision": 0.9847, "recall": 0.9961, "f1": 0.9904, "support": 259},
         "plastic": {"precision": 0.9306, "recall": 0.9828, "f1": 0.9560, "support": 232}
       },
-      "source": "03_Feature_Fusion.ipynb — final cell, downloads the deployed resnet50_clip_fusion_final.tflite from Drive and evaluates on test_split.csv"
+      "source": "03_Feature_Fusion.ipynb final cell (downloads deployed resnet50_clip_fusion_final.tflite from Drive, evaluates on test_split.csv); cross-verified from resnet50_clip_fusion_predictions.csv in 04_Visualize_result_model.ipynb"
+    },
+    "CLIP Linear Probe": {
+      "file": null,
+      "note": "Not shipped as a standalone file in the app — runs live inside CLIP Verify only (see clip_linear_probe.pt + load_clip_verify_bundle() in app.py). Included here for comparison, not as a deployable option.",
+      "size_mb": null,
+      "test_accuracy": 0.9065,
+      "per_class": {
+        "glass":   {"precision": 0.9793, "recall": 0.8256, "f1": 0.8961, "support": 172},
+        "metal":   {"precision": 0.9037, "recall": 0.9286, "f1": 0.9161, "support": 182},
+        "paper":   {"precision": 0.9231, "recall": 0.9730, "f1": 0.9472, "support": 259},
+        "plastic": {"precision": 0.8458, "recall": 0.8750, "f1": 0.8600, "support": 232}
+      },
+      "source": "02_CLIP_LinearProbe.ipynb; verified from clip_linearprobe_predictions.csv in 04_Visualize_result_model.ipynb (per-class values derived from its confusion matrix, cell 12)"
     }
+  },
+  "clip_verify": {
+    "threshold": 0.90,
+    "threshold_note": "Fixed in advance (CLIP_VERIFY_DEFAULT_THRESHOLD in app.py), NOT searched on this test set — see clip_verify_threshold_search.py for the validation-set-only search this should be paired with.",
+    "combined_test_accuracy": 0.9621,
+    "resnet50_alone_test_accuracy": 0.9716,
+    "verdict": "Does not beat ResNet50 alone (96.21% vs 97.16%)",
+    "source": "04_Visualize_result_model.ipynb, Figure 8 — computed from resnet50_predictions.csv + clip_linearprobe_predictions.csv"
   }
 }
