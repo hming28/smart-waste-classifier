@@ -54,7 +54,7 @@ MODELS = {
     "CNN": "AdvancedCNN_none_classweight.keras",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
-    "Feature Fusion (ResNet50+CLIP)": FUSION_MODEL_FILENAME,
+    "ResNet50+CLIP": FUSION_MODEL_FILENAME,
 }
 
 # CLIP Verify: an optional per-model toggle for CNN/MobileNetV2/ResNet50 that
@@ -67,7 +67,7 @@ CLIP_VERIFY_DEFAULT_THRESHOLD = 0.90
 
 # Models that need a local .keras/.tflite file AND CLIP loaded live (both frameworks
 # resident in memory at once — the heaviest combination in this app by far).
-FUSION_MODELS = {"Feature Fusion (ResNet50+CLIP)"}
+FUSION_MODELS = {"ResNet50+CLIP"}
 
 # Each model was trained with a different input normalization
 PREPROCESS_FUNCS = {
