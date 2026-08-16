@@ -54,7 +54,7 @@ MODELS = {
     "CNN": "AdvancedCNN_none_classweight.keras",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
-    "Feature Fusion (ResNet50+CLIP)": FUSION_MODEL_FILENAME,
+    "ResNet50+CLIP": FUSION_MODEL_FILENAME,
 }
 
 # CLIP Verify: an optional per-model toggle for CNN/MobileNetV2/ResNet50 that
