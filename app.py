@@ -54,7 +54,7 @@ MODELS = {
     "CNN": "AdvancedCNN_none_classweight.keras",
     "MobileNetV2": "mobilenetv2_garbage_classifier_4class.keras",
     "ResNet50": "resnet50_model_quantized.tflite",
-    "ResNet50+CLIP": FUSION_MODEL_FILENAME,
+    "Feature Fusion (ResNet50+CLIP)": FUSION_MODEL_FILENAME,
 }
 
 # CLIP Verify: an optional per-model toggle for CNN/MobileNetV2/ResNet50 that
@@ -247,16 +247,21 @@ def load_clip_verify_bundle():
     head (512 -> 4), used to double-check CNN/MobileNetV2/ResNet50 predictions
     when their own confidence is low. Mirrors 02_CLIP_LinearProbe.ipynb.
 
-    ⚠️ Be upfront about this, including in the UI: a threshold-gated version of
-    this was tested empirically on the 845-image shared test split and did NOT
-    beat ResNet50 alone (best test-set-searched threshold got 96.80%, vs.
-    96.92% for ResNet50 alone — worse, not better). ResNet50's confidence is
-    often still high even when wrong (mean 0.86 even on wrong predictions), so
-    a simple confidence cutoff can't cleanly separate "trust me" from "ask
-    CLIP" on these clean, studio-style dataset photos. This toggle exists for
-    experimentation and for real-world / out-of-distribution photos, where the
-    effect is untested and may differ — not because it's confirmed to help on
-    the benchmark images the model was graded on."""
+    ⚠️ Be upfront about this, including in the UI: evaluated on the 845-image
+    shared test split at a threshold fixed in advance (90%, not searched —
+    see clip_verify_threshold_search.py for the validation-set-only search
+    this should be paired with), CLIP Verify did NOT beat ResNet50 alone —
+    96.21% combined vs. 97.16% for ResNet50 alone (confirmed via
+    04_Visualize_result_model.ipynb, Figure 8, using real per-image
+    predictions from resnet50_predictions.csv + clip_linearprobe_predictions.csv).
+    Figure 5 in that same notebook shows why: ResNet50's confidence
+    distribution overlaps heavily between its correct and incorrect
+    predictions on these clean, studio-style dataset photos, so a simple
+    confidence cutoff can't cleanly separate "trust me" from "ask CLIP."
+    This toggle exists for experimentation and for real-world /
+    out-of-distribution photos, where the effect is untested and may differ —
+    not because it's confirmed to help on the benchmark images the model was
+    graded on."""
     import torch
     import torch.nn as nn
 
@@ -556,7 +561,10 @@ with tab_compare:
             "this file holds the numbers for the charts below."
         )
     else:
-        model_names = list(results["models"].keys())
+        # Only the models actually selectable in the app — model_results.json also
+        # keeps a "CLIP Linear Probe" entry for reference (used by the Colab
+        # comparison notebook), but it's not a standalone deployable option here.
+        model_names = [m for m in results["models"] if results["models"][m].get("file")]
         class_names = results["class_names"]
         test_n = results["test_set_size"]
 
