@@ -39,7 +39,7 @@
       },
       "source": "stb_v2_resnet50_garbage_classification.ipynb final cell (downloads deployed resnet50_model_quantized.tflite from Drive, evaluates on test_split.csv); cross-verified from resnet50_predictions.csv in 04_Visualize_result_model.ipynb"
     },
-    "Feature Fusion (ResNet50+CLIP)": {
+    "ResNet50+CLIP": {
       "file": "resnet50_clip_fusion_final.tflite",
       "size_mb": 24.08,
       "test_accuracy": 0.9680,
