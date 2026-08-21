@@ -591,7 +591,7 @@ with tab_compare:
             "Model": model_names,
             "Test Accuracy (%)": [results["models"][m]["test_accuracy"] * 100 for m in model_names],
         }).set_index("Model")
-        st.bar_chart(acc_df, horizontal=True)
+        st.bar_chart(acc_df, horizontal=True, sort=False)
 
         cols = st.columns(len(model_names))
         for col, name in zip(cols, model_names):
@@ -672,7 +672,7 @@ with tab_about:
     | CNN | ✅ Available |
     | MobileNetV2 | ✅ Available |
     | ResNet50 | ✅ Available |
-    | Feature Fusion (ResNet50+CLIP) | ✅ Available — dual-branch trained framework, 96.80% test accuracy |
+    | ResNet50+CLIP | ✅ Available — dual-branch trained framework, 96.80% test accuracy |
 
     **CLIP Verify** (optional toggle for CNN/MobileNetV2/ResNet50): double-checks
     low-confidence predictions using CLIP Linear Probe. ⚠️ Tested on the benchmark
