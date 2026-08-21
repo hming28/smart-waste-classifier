@@ -595,7 +595,7 @@ with tab_compare:
             f"(the same .keras/.tflite in this repo) on the same shared {test_n}-image test split."
         )
 
-        # --- Overall test accuracy ---
+        # --- Overall test accuracy (headline chart, full width) ---
         st.markdown("#### Overall Test Accuracy")
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
         accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
@@ -619,42 +619,31 @@ with tab_compare:
 
         st.divider()
 
-        # --- Per-class F1-score heatmap ---
-        st.markdown("#### Per-Class F1-Score")
-        st.caption(
-            "Shows where each model struggles with a specific waste type. "
-            "Darker green = better."
-        )
-        f1_df = pd.DataFrame(
-            {
-                name: [results["models"][name]["per_class"][c]["f1"] for c in class_names]
-                for name in model_names
-            },
-            index=[c.title() for c in class_names],
-        ).T
-        st.dataframe(
-            f1_df.style.format("{:.3f}").background_gradient(cmap="Greens", vmin=0.80, vmax=1.00)
-        )
 
-        st.divider()
+        def show_exported_figure(filename: str, missing_label: str):
+            """Show a Colab-exported PNG from FIGURES_DIR, or a friendly
+            'not uploaded yet' message instead of crashing if it's missing."""
+            path = os.path.join(FIGURES_DIR, filename)
+            if os.path.exists(path):
+                st.image(path)
+            else:
+                st.info(
+                    f"📊 {missing_label} not available yet — export it from "
+                    f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
+                    f"`{path}` to show it here."
+                )
 
-        # --- Model size vs. accuracy trade-off ---
-        st.markdown("#### Model Size vs. Accuracy")
-        st.caption(
-            "Left: smaller/faster models. Right: larger/most accurate models — split into two "
-            "panels since the larger models sit close together in size and get cramped on one axis. "
-            "This trade-off is why MobileNetV2 exists for phones even though ResNet50 scores higher."
-        )
-        # Split by file size at the median gap, not a hardcoded count, so this
-        # still makes sense if more models are added later.
-        sizes_sorted = sorted(model_names, key=lambda m: results["models"][m]["size_mb"])
-        midpoint = len(sizes_sorted) // 2
-        left_models, right_models = sizes_sorted[:midpoint], sizes_sorted[midpoint:]
+        # --- Row: Model Size vs. Accuracy | Per-Class F1-Score ---
+        col_left, col_right = st.columns(2)
 
-        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(11, 5))
-        for ax, group, title in [(ax_left, left_models, "Smaller Models"),
-                                   (ax_right, right_models, "Larger Models")]:
-            for i, name in enumerate(group):
+        with col_left:
+            st.markdown("#### Model Size vs. Accuracy")
+            st.caption(
+                "Bigger dot = bigger file. Bottom-left = small & fast, top-right = big & accurate — "
+                "this trade-off is why MobileNetV2 exists for phones even though ResNet50 scores higher."
+            )
+            fig, ax = plt.subplots(figsize=(6, 5))
+            for i, name in enumerate(model_names):
                 size = results["models"][name]["size_mb"]
                 acc = results["models"][name]["test_accuracy"] * 100
                 color = MODEL_PLOT_COLORS.get(name, "#555555")
@@ -664,32 +653,72 @@ with tab_compare:
                 ax.annotate(name, (size, acc), textcoords="offset points", xytext=offset,
                            ha="center", fontweight="bold", fontsize=9)
             ax.set_xlabel("Model File Size (MB)")
-            ax.set_title(title, fontsize=11)
+            ax.set_ylabel("Test Accuracy (%)")
             ax.set_ylim(75, 100)
             ax.grid(True, linestyle="--", alpha=0.4)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-        ax_left.set_ylabel("Test Accuracy (%)")
-        fig.tight_layout()
-        st.pyplot(fig)
+            fig.tight_layout()
+            st.pyplot(fig)
+
+        with col_right:
+            st.markdown("#### Per-Class F1-Score")
+            st.caption(
+                "Shows where each model struggles with a specific waste type. "
+                "Darker green = better."
+            )
+            f1_df = pd.DataFrame(
+                {
+                    name: [results["models"][name]["per_class"][c]["f1"] for c in class_names]
+                    for name in model_names
+                },
+                index=[c.title() for c in class_names],
+            ).T
+            st.dataframe(
+                f1_df.style.format("{:.3f}").background_gradient(cmap="Greens", vmin=0.80, vmax=1.00)
+            )
 
         st.divider()
 
-        # --- Confusion matrices (static image, exported from Colab) ---
-        st.markdown("#### Confusion Matrices")
-        st.caption(
-            "Shows exactly which waste types each model confuses with which — the diagonal is "
-            "correct predictions, everything off it is a specific error mode."
-        )
-        confusion_matrix_path = os.path.join(FIGURES_DIR, "fig3_confusion_matrices.png")
-        if os.path.exists(confusion_matrix_path):
-            st.image(confusion_matrix_path)
-        else:
-            st.info(
-                f"📊 Confusion matrix chart not available yet — export Figure 3 from "
-                f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
-                f"`{confusion_matrix_path}` to show it here."
+        # --- Row: Confusion Matrices | CLIP Verify Effect ---
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            st.markdown("#### Confusion Matrices")
+            st.caption(
+                "Which waste types each model confuses with which — the diagonal is correct "
+                "predictions, everything off it is a specific error mode."
             )
+            show_exported_figure("fig3_confusion_matrices.png", "Confusion matrix chart")
+
+        with col_right:
+            st.markdown("#### Does CLIP Verify Help?")
+            st.caption(
+                "CNN, MobileNetV2, and ResNet50 alone vs. paired with CLIP Verify, at the "
+                "fixed 90% threshold used in this app."
+            )
+            show_exported_figure("fig8_clip_verify_effect.png", "CLIP Verify comparison chart")
+
+        st.divider()
+
+        # --- Row: ROC Curves | Confidence Distribution ---
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            st.markdown("#### ROC Curves by Class")
+            st.caption(
+                "One-vs-rest ROC per waste type — how well each model separates that class "
+                "from everything else. Higher AUC = better."
+            )
+            show_exported_figure("fig4_roc_curves.png", "ROC curve chart")
+
+        with col_right:
+            st.markdown("#### Confidence: Correct vs. Incorrect")
+            st.caption(
+                "If green (correct) and red (incorrect) overlap heavily, a model's confidence "
+                "score isn't a reliable trust signal — this is why CLIP Verify doesn't help much."
+            )
+            show_exported_figure("fig5_confidence_distribution.png", "Confidence distribution chart")
 
         st.divider()
 
@@ -700,9 +729,10 @@ with tab_compare:
                 "Per-image inference speed and training curves for the final deployed models "
                 "aren't included yet — the notebooks currently only *plot* those as images "
                 "rather than printing the raw numbers, so they'd need to be re-exported as "
-                "text/CSV first. ROC curves, the confidence-distribution violin plot, the "
-                "per-class F1 heatmap image, and the CLIP Verify comparison are all available "
-                "as figures in `04_Visualize_result_model.ipynb` if you'd like them added here too."
+                "text/CSV first. The threshold-sensitivity sweep (Figure 9 in the notebook) is "
+                "left out of this dashboard deliberately — it's exploratory-only and belongs in "
+                "the report, not here, to avoid it looking like the deployed threshold was chosen "
+                "by eyeballing this test-set curve."
             )
 
 with tab_about:
