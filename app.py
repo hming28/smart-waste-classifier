@@ -4,6 +4,7 @@ import cv2
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
@@ -48,6 +49,16 @@ def load_model_results():
     with open(MODEL_RESULTS_FILENAME) as f:
         return json.load(f)
 
+
+# Colors for the Model Size vs. Accuracy chart on the Compare tab — deliberately
+# darker/more saturated than Streamlit's default categorical palette, which
+# renders quite pale for scatter plots.
+MODEL_PLOT_COLORS = {
+    "CNN": "#4C5C8A",
+    "MobileNetV2": "#1E8449",
+    "ResNet50": "#1B4F91",
+    "ResNet50+CLIP": "#B33A6B",
+}
 
 # Model config — the 4 models offered in the UI.
 MODELS = {
@@ -613,12 +624,24 @@ with tab_compare:
             "Bigger dot = bigger file. Bottom-left = small & fast, top-right = big & accurate — "
             "this trade-off is why MobileNetV2 exists for phones even though ResNet50 scores higher."
         )
-        size_df = pd.DataFrame({
-            "Model": model_names,
-            "Size (MB)": [results["models"][m]["size_mb"] for m in model_names],
-            "Test Accuracy (%)": [results["models"][m]["test_accuracy"] * 100 for m in model_names],
-        })
-        st.scatter_chart(size_df, x="Size (MB)", y="Test Accuracy (%)", size="Size (MB)", color="Model")
+        fig, ax = plt.subplots(figsize=(7, 5))
+        for i, name in enumerate(model_names):
+            size = results["models"][name]["size_mb"]
+            acc = results["models"][name]["test_accuracy"] * 100
+            color = MODEL_PLOT_COLORS.get(name, "#555555")
+            ax.scatter(size, acc, s=size * 20, color=color, alpha=0.9,
+                       edgecolor="white", linewidth=1.5, zorder=3)
+            offset = (0, 14) if i % 2 == 0 else (0, -20)
+            ax.annotate(name, (size, acc), textcoords="offset points", xytext=offset,
+                       ha="center", fontweight="bold", fontsize=9)
+        ax.set_xlabel("Model File Size (MB)")
+        ax.set_ylabel("Test Accuracy (%)")
+        ax.set_ylim(75, 100)
+        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        fig.tight_layout()
+        st.pyplot(fig)
 
         st.divider()
 
