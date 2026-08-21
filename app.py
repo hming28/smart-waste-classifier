@@ -593,7 +593,7 @@ with tab_compare:
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
         accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
         colors = ACCURACY_BAR_COLORS[:len(model_names)]
-        fig, ax = plt.subplots(figsize=(8, 3))
+        fig, ax = plt.subplots(figsize=(5, 1))
         # reversed so the first model (CNN) ends up at the top, since barh
         # otherwise plots bottom-to-top
         bars = ax.barh(model_names[::-1], accs[::-1], color=colors[::-1])
