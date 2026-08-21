@@ -60,6 +60,10 @@ MODEL_PLOT_COLORS = {
     "ResNet50+CLIP": "#B33A6B",
 }
 
+# One color per bar for the Overall Test Accuracy chart, in model_names order
+# (CNN, MobileNetV2, ResNet50, ResNet50+CLIP) — orange/yellow/green/blue.
+ACCURACY_BAR_COLORS = ["#E67E22", "#F1C40F", "#27AE60", "#2E86C1"]
+
 # Model config — the 4 models offered in the UI.
 MODELS = {
     "CNN": "AdvancedCNN_none_classweight.keras",
@@ -587,11 +591,20 @@ with tab_compare:
         # --- Overall test accuracy ---
         st.markdown("#### Overall Test Accuracy")
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
-        acc_df = pd.DataFrame({
-            "Model": model_names,
-            "Test Accuracy (%)": [results["models"][m]["test_accuracy"] * 100 for m in model_names],
-        }).set_index("Model")
-        st.bar_chart(acc_df, horizontal=True, sort=False)
+        accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
+        colors = ACCURACY_BAR_COLORS[:len(model_names)]
+        fig, ax = plt.subplots(figsize=(8, 0.7 * len(model_names) + 1))
+        # reversed so the first model (CNN) ends up at the top, since barh
+        # otherwise plots bottom-to-top
+        bars = ax.barh(model_names[::-1], accs[::-1], color=colors[::-1])
+        ax.bar_label(bars, fmt="%.2f%%", padding=5, fontweight="bold")
+        ax.set_xlabel("Test Accuracy (%)")
+        ax.set_xlim(0, 108)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="x", linestyle="--", alpha=0.4)
+        fig.tight_layout()
+        st.pyplot(fig)
 
         cols = st.columns(len(model_names))
         for col, name in zip(cols, model_names):
