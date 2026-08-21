@@ -594,6 +594,7 @@ with tab_compare:
         accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
         colors = ACCURACY_BAR_COLORS[:len(model_names)]
         fig, ax = plt.subplots(figsize=(6, 3), dpi=80)  # whole image smaller
+        st.pyplot(fig, use_container_width=False)
         # reversed so the first model (CNN) ends up at the top, since barh
         # otherwise plots bottom-to-top
         bars = ax.barh(model_names[::-1], accs[::-1], color=colors[::-1])
