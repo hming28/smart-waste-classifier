@@ -39,6 +39,13 @@ FUSION_MODEL_FILENAME = "resnet50_clip_fusion_final.tflite"
 # each entry's "source" field.
 MODEL_RESULTS_FILENAME = "model_results.json"
 
+# Static chart images exported from 04_Visualize_result_model.ipynb (Colab) and
+# committed to the repo under this folder — for figures that aren't worth
+# reimplementing live in matplotlib (e.g. confusion matrices, ROC curves).
+# Overall Test Accuracy and Model Size vs. Accuracy stay as live matplotlib
+# charts above/below this, driven directly by model_results.json.
+FIGURES_DIR = "figures"
+
 
 @st.cache_data
 def load_model_results():
@@ -593,7 +600,7 @@ with tab_compare:
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
         accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
         colors = ACCURACY_BAR_COLORS[:len(model_names)]
-        fig, ax = plt.subplots(figsize=(8, 0.7 * len(model_names) + 1))
+        fig, ax = plt.subplots(figsize=(10, 5))
         # reversed so the first model (CNN) ends up at the top, since barh
         # otherwise plots bottom-to-top
         bars = ax.barh(model_names[::-1], accs[::-1], color=colors[::-1])
@@ -634,27 +641,55 @@ with tab_compare:
         # --- Model size vs. accuracy trade-off ---
         st.markdown("#### Model Size vs. Accuracy")
         st.caption(
-            "Bigger dot = bigger file. Bottom-left = small & fast, top-right = big & accurate — "
-            "this trade-off is why MobileNetV2 exists for phones even though ResNet50 scores higher."
+            "Left: smaller/faster models. Right: larger/most accurate models — split into two "
+            "panels since the larger models sit close together in size and get cramped on one axis. "
+            "This trade-off is why MobileNetV2 exists for phones even though ResNet50 scores higher."
         )
-        fig, ax = plt.subplots(figsize=(7, 5))
-        for i, name in enumerate(model_names):
-            size = results["models"][name]["size_mb"]
-            acc = results["models"][name]["test_accuracy"] * 100
-            color = MODEL_PLOT_COLORS.get(name, "#555555")
-            ax.scatter(size, acc, s=size * 20, color=color, alpha=0.9,
-                       edgecolor="white", linewidth=1.5, zorder=3)
-            offset = (0, 14) if i % 2 == 0 else (0, -20)
-            ax.annotate(name, (size, acc), textcoords="offset points", xytext=offset,
-                       ha="center", fontweight="bold", fontsize=9)
-        ax.set_xlabel("Model File Size (MB)")
-        ax.set_ylabel("Test Accuracy (%)")
-        ax.set_ylim(75, 100)
-        ax.grid(True, linestyle="--", alpha=0.4)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
+        # Split by file size at the median gap, not a hardcoded count, so this
+        # still makes sense if more models are added later.
+        sizes_sorted = sorted(model_names, key=lambda m: results["models"][m]["size_mb"])
+        midpoint = len(sizes_sorted) // 2
+        left_models, right_models = sizes_sorted[:midpoint], sizes_sorted[midpoint:]
+
+        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(11, 5))
+        for ax, group, title in [(ax_left, left_models, "Smaller Models"),
+                                   (ax_right, right_models, "Larger Models")]:
+            for i, name in enumerate(group):
+                size = results["models"][name]["size_mb"]
+                acc = results["models"][name]["test_accuracy"] * 100
+                color = MODEL_PLOT_COLORS.get(name, "#555555")
+                ax.scatter(size, acc, s=size * 20, color=color, alpha=0.9,
+                           edgecolor="white", linewidth=1.5, zorder=3)
+                offset = (0, 14) if i % 2 == 0 else (0, -20)
+                ax.annotate(name, (size, acc), textcoords="offset points", xytext=offset,
+                           ha="center", fontweight="bold", fontsize=9)
+            ax.set_xlabel("Model File Size (MB)")
+            ax.set_title(title, fontsize=11)
+            ax.set_ylim(75, 100)
+            ax.grid(True, linestyle="--", alpha=0.4)
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+        ax_left.set_ylabel("Test Accuracy (%)")
         fig.tight_layout()
         st.pyplot(fig)
+
+        st.divider()
+
+        # --- Confusion matrices (static image, exported from Colab) ---
+        st.markdown("#### Confusion Matrices")
+        st.caption(
+            "Shows exactly which waste types each model confuses with which — the diagonal is "
+            "correct predictions, everything off it is a specific error mode."
+        )
+        confusion_matrix_path = os.path.join(FIGURES_DIR, "fig3_confusion_matrices.png")
+        if os.path.exists(confusion_matrix_path):
+            st.image(confusion_matrix_path)
+        else:
+            st.info(
+                f"📊 Confusion matrix chart not available yet — export Figure 3 from "
+                f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
+                f"`{confusion_matrix_path}` to show it here."
+            )
 
         st.divider()
 
@@ -662,10 +697,12 @@ with tab_compare:
             for name in model_names:
                 st.caption(f"**{name}** — {results['models'][name]['source']}")
             st.markdown(
-                "Confusion matrices, per-image inference speed, and training curves for the "
-                "final deployed models aren't included yet — the notebooks currently only "
-                "*plot* those as images rather than printing the raw numbers, so they'd need "
-                "to be re-exported as text/CSV first."
+                "Per-image inference speed and training curves for the final deployed models "
+                "aren't included yet — the notebooks currently only *plot* those as images "
+                "rather than printing the raw numbers, so they'd need to be re-exported as "
+                "text/CSV first. ROC curves, the confidence-distribution violin plot, the "
+                "per-class F1 heatmap image, and the CLIP Verify comparison are all available "
+                "as figures in `04_Visualize_result_model.ipynb` if you'd like them added here too."
             )
 
 with tab_about:
