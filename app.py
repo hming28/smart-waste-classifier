@@ -391,6 +391,18 @@ st.markdown("""
         margin: 0.5rem 0;
         border-left: 4px solid;
     }
+    .uploaded-image-wrapper {
+        display: inline-block;
+        border: 3px solid #667eea;
+        border-radius: 12px;
+        padding: 6px;
+        background: var(--secondary-background-color);
+        box-shadow: 0 2px 12px rgba(102, 126, 234, 0.25);
+    }
+    .uploaded-image-wrapper img {
+        border-radius: 8px;
+        display: block;
+    }
     .model-unavailable {
         color: #e74c3c;
         font-size: 0.8rem;
@@ -470,7 +482,17 @@ with tab_home:
             image = Image.open(camera_file).convert("RGB")
         elif uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
-            st.image(image, caption="Uploaded Image", width=200)
+            import base64, io
+            buf = io.BytesIO()
+            image.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode()
+            st.markdown(
+                f'<div class="uploaded-image-wrapper">'
+                f'<img src="data:image/png;base64,{b64}" width="150" alt="Uploaded Image" />'
+                f'</div>'
+                f'<p style="text-align:center;font-size:0.85rem;opacity:0.7;margin-top:4px;">Uploaded Image</p>',
+                unsafe_allow_html=True,
+            )
         else:
             image = None
 
@@ -593,7 +615,7 @@ with tab_compare:
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
         accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
         colors = ACCURACY_BAR_COLORS[:len(model_names)]
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=80)  # whole image smaller
+        fig, ax = plt.subplots(figsize=(10, 5))
         # reversed so the first model (CNN) ends up at the top, since barh
         # otherwise plots bottom-to-top
         bars = ax.barh(model_names[::-1], accs[::-1], color=colors[::-1])
