@@ -681,19 +681,6 @@ with tab_compare:
 
         st.divider()
 
-        with st.expander("📁 Data sources & what's not shown yet"):
-            for name in model_names:
-                st.caption(f"**{name}** — {results['models'][name]['source']}")
-            st.markdown(
-                "Per-image inference speed and training curves for the final deployed models "
-                "aren't included yet — the notebooks currently only *plot* those as images "
-                "rather than printing the raw numbers, so they'd need to be re-exported as "
-                "text/CSV first. The threshold-sensitivity sweep (Figure 9 in the notebook) is "
-                "left out of this dashboard deliberately — it's exploratory-only and belongs in "
-                "the report, not here, to avoid it looking like the deployed threshold was chosen "
-                "by eyeballing this test-set curve."
-            )
-
 with tab_about:
     st.markdown("## About Smart Waste AI")
     st.markdown("""
