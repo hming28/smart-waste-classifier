@@ -4,7 +4,6 @@ import cv2
 import streamlit as st
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
@@ -56,20 +55,6 @@ def load_model_results():
     with open(MODEL_RESULTS_FILENAME) as f:
         return json.load(f)
 
-
-# Colors for the Model Size vs. Accuracy chart on the Compare tab — deliberately
-# darker/more saturated than Streamlit's default categorical palette, which
-# renders quite pale for scatter plots.
-MODEL_PLOT_COLORS = {
-    "CNN": "#4C5C8A",
-    "MobileNetV2": "#1E8449",
-    "ResNet50": "#1B4F91",
-    "ResNet50+CLIP": "#B33A6B",
-}
-
-# One color per bar for the Overall Test Accuracy chart, in model_names order
-# (CNN, MobileNetV2, ResNet50, ResNet50+CLIP) — orange/yellow/green/blue.
-ACCURACY_BAR_COLORS = ["#E67E22", "#F1C40F", "#27AE60", "#2E86C1"]
 
 # Model config — the 4 models offered in the UI.
 MODELS = {
@@ -595,23 +580,27 @@ with tab_compare:
             f"(the same .keras/.tflite in this repo) on the same shared {test_n}-image test split."
         )
 
-        # --- Overall test accuracy (headline chart, full width) ---
+        def show_exported_figure(filename: str, missing_label: str, width="stretch"):
+            """Show a Colab-exported PNG from FIGURES_DIR, or a friendly
+            'not uploaded yet' message instead of crashing if it's missing.
+            width caps the display size — these PNGs are saved at 300dpi from
+            Colab, so shown at "natural" size they'd render huge. Pass an int
+            (pixels), 'stretch' (fill container - default), or 'content'."""
+            path = os.path.join(FIGURES_DIR, filename)
+            if os.path.exists(path):
+                st.image(path, width=width)
+            else:
+                st.info(
+                    f"📊 {missing_label} not available yet — export it from "
+                    f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
+                    f"`{path}` to show it here."
+                )
+
+        # --- Overall test accuracy (headline chart, full width but capped so
+        # the 300dpi export doesn't render oversized) ---
         st.markdown("#### Overall Test Accuracy")
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
-        accs = [results["models"][m]["test_accuracy"] * 100 for m in model_names]
-        colors = ACCURACY_BAR_COLORS[:len(model_names)]
-        fig, ax = plt.subplots(figsize=(10, 5))
-        # reversed so the first model (CNN) ends up at the top, since barh
-        # otherwise plots bottom-to-top
-        bars = ax.barh(model_names[::-1], accs[::-1], color=colors[::-1])
-        ax.bar_label(bars, fmt="%.2f%%", padding=5, fontweight="bold")
-        ax.set_xlabel("Test Accuracy (%)")
-        ax.set_xlim(0, 108)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(axis="x", linestyle="--", alpha=0.4)
-        fig.tight_layout()
-        st.pyplot(fig)
+        show_exported_figure("fig1_overall_accuracy.png", "Overall accuracy chart", width=700)
 
         cols = st.columns(len(model_names))
         for col, name in zip(cols, model_names):
@@ -619,19 +608,6 @@ with tab_compare:
 
         st.divider()
 
-
-        def show_exported_figure(filename: str, missing_label: str):
-            """Show a Colab-exported PNG from FIGURES_DIR, or a friendly
-            'not uploaded yet' message instead of crashing if it's missing."""
-            path = os.path.join(FIGURES_DIR, filename)
-            if os.path.exists(path):
-                st.image(path)
-            else:
-                st.info(
-                    f"📊 {missing_label} not available yet — export it from "
-                    f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
-                    f"`{path}` to show it here."
-                )
 
         # --- Row: Model Size vs. Accuracy | Per-Class F1-Score ---
         col_left, col_right = st.columns(2)
@@ -642,24 +618,7 @@ with tab_compare:
                 "Bigger dot = bigger file. Bottom-left = small & fast, top-right = big & accurate — "
                 "this trade-off is why MobileNetV2 exists for phones even though ResNet50 scores higher."
             )
-            fig, ax = plt.subplots(figsize=(6, 5))
-            for i, name in enumerate(model_names):
-                size = results["models"][name]["size_mb"]
-                acc = results["models"][name]["test_accuracy"] * 100
-                color = MODEL_PLOT_COLORS.get(name, "#555555")
-                ax.scatter(size, acc, s=size * 20, color=color, alpha=0.9,
-                           edgecolor="white", linewidth=1.5, zorder=3)
-                offset = (0, 14) if i % 2 == 0 else (0, -20)
-                ax.annotate(name, (size, acc), textcoords="offset points", xytext=offset,
-                           ha="center", fontweight="bold", fontsize=9)
-            ax.set_xlabel("Model File Size (MB)")
-            ax.set_ylabel("Test Accuracy (%)")
-            ax.set_ylim(75, 100)
-            ax.grid(True, linestyle="--", alpha=0.4)
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-            fig.tight_layout()
-            st.pyplot(fig)
+            show_exported_figure("fig7_size_vs_accuracy.png", "Model size vs. accuracy chart")
 
         with col_right:
             st.markdown("#### Per-Class F1-Score")
