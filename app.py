@@ -605,7 +605,7 @@ with tab_compare:
         )
         col_chart, col_metrics = st.columns([3, 1])
         with col_chart:
-            show_exported_figure("fig1_overall_accuracy.png", "Overall accuracy chart", width=440)
+            show_exported_figure("fig1_overall_accuracy.png", "Overall accuracy chart", width=650)
         with col_metrics:
             for name in acc_model_names:
                 st.metric(name, f"{results['models'][name]['test_accuracy'] * 100:.2f}%")
