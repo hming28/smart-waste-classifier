@@ -600,9 +600,11 @@ with tab_compare:
         st.markdown("#### Overall Test Accuracy")
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
 
-        acc_model_names = model_names + (
+        # CNN, CLIP Linear Probe, then the rest of the deployed models — matches
+        # the bar order in fig1_overall_accuracy.png
+        acc_model_names = [model_names[0]] + (
             ["CLIP Linear Probe"] if "CLIP Linear Probe" in results["models"] else []
-        )
+        ) + model_names[1:]
         col_chart, col_metrics = st.columns([3, 1])
         with col_chart:
             show_exported_figure("fig1_overall_accuracy.png", "Overall accuracy chart", width=650)
