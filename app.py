@@ -596,15 +596,19 @@ with tab_compare:
                     f"`{path}` to show it here."
                 )
 
-        # --- Overall test accuracy (headline chart, full width but capped so
-        # the 300dpi export doesn't render oversized) ---
+        # --- Overall test accuracy (headline chart, image left / metrics right) ---
         st.markdown("#### Overall Test Accuracy")
         st.caption('Higher is better — the single number that answers "which model is most accurate?"')
-        show_exported_figure("fig1_overall_accuracy.png", "Overall accuracy chart", width=700)
 
-        cols = st.columns(len(model_names))
-        for col, name in zip(cols, model_names):
-            col.metric(name, f"{results['models'][name]['test_accuracy'] * 100:.2f}%")
+        acc_model_names = model_names + (
+            ["CLIP Linear Probe"] if "CLIP Linear Probe" in results["models"] else []
+        )
+        col_chart, col_metrics = st.columns([3, 1])
+        with col_chart:
+            show_exported_figure("fig1_overall_accuracy.png", "Overall accuracy chart")
+        with col_metrics:
+            for name in acc_model_names:
+                st.metric(name, f"{results['models'][name]['test_accuracy'] * 100:.2f}%")
 
         st.divider()
 
