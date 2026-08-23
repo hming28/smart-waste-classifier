@@ -623,13 +623,18 @@ with tab_compare:
         with col_right:
             st.markdown("#### Per-Class F1-Score")
             st.caption(
-                "Shows where each model struggles with a specific waste type. "
-                "Darker green = better."
+                "Shows where each model struggles with a specific waste type. Darker green = "
+                "better. CLIP Linear Probe is included as reference — it's not a selectable "
+                "model in this app, only used internally by CLIP Verify."
+            )
+            # Deployed models first, then CLIP Linear Probe appended as a reference row
+            f1_model_names = model_names + (
+                ["CLIP Linear Probe"] if "CLIP Linear Probe" in results["models"] else []
             )
             f1_df = pd.DataFrame(
                 {
                     name: [results["models"][name]["per_class"][c]["f1"] for c in class_names]
-                    for name in model_names
+                    for name in f1_model_names
                 },
                 index=[c.title() for c in class_names],
             ).T
