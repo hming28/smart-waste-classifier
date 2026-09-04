@@ -7,7 +7,3 @@ pillow
 opencv-python-headless
 torch --index-url https://download.pytorch.org/whl/cpu
 transformers
-# Live Camera Mode (📹 Live tab). The app degrades to a snapshot
-# fallback if these are absent, so they are not hard requirements.
-streamlit-webrtc
-av
