@@ -5,6 +5,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from PIL import Image
+from slides import render_slides
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
