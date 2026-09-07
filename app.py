@@ -58,25 +58,6 @@ def load_model_results():
         return json.load(f)
 
 
-def show_exported_figure(filename: str, missing_label: str, width="stretch"):
-    """Show a Colab-exported PNG from FIGURES_DIR, or a friendly
-    'not uploaded yet' message instead of crashing if it's missing.
-    width caps the display size — these PNGs are saved at 300dpi from
-    Colab, so shown at "natural" size they'd render huge. Pass an int
-    (pixels), 'stretch' (fill container - default), or 'content'.
-    Shared by the Compare tab and the Slides tab so both degrade the same
-    way when figures/ or model_results.json haven't been uploaded yet."""
-    path = os.path.join(FIGURES_DIR, filename)
-    if os.path.exists(path):
-        st.image(path, width=width)
-    else:
-        st.info(
-            f"📊 {missing_label} not available yet — export it from "
-            f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
-            f"`{path}` to show it here."
-        )
-
-
 # Model config — the 4 models offered in the UI.
 MODELS = {
     "CNN": "AdvancedCNN_none_classweight.keras",
@@ -621,41 +602,6 @@ def draw_live_overlay(bgr_frame: np.ndarray, settings, probs, cam_box, latency_m
     return bgr_frame
 
 
-def build_ice_servers() -> list:
-    """ICE servers for the WebRTC handshake.
-
-    A public STUN server is enough on a LAN or when at least one side has a
-    reachable address. It is NOT enough on many deployments (Streamlit Community
-    Cloud included): when both the browser and the server sit behind symmetric
-    NAT, the peers never find a direct path and the stream hangs on CONNECTING
-    forever. That case needs a TURN relay.
-
-    TURN credentials are optional and read from st.secrets so they never land in
-    git. Add them in the app's Settings -> Secrets as:
-
-        [turn]
-        urls = ["turn:your-turn-host:3478"]
-        username = "..."
-        credential = "..."
-
-    With no secrets configured this returns STUN only, and the Live tab still
-    offers the snapshot fallback, which needs no WebRTC at all."""
-    ice = [{"urls": ["stun:stun.l.google.com:19302"]}]
-    try:
-        turn = st.secrets.get("turn")
-    except Exception:
-        # st.secrets raises rather than returning empty when no secrets file
-        # exists at all, which is the normal case for a local checkout.
-        turn = None
-    if turn and turn.get("urls"):
-        ice.append({
-            "urls": list(turn["urls"]),
-            "username": turn.get("username", ""),
-            "credential": turn.get("credential", ""),
-        })
-    return ice
-
-
 # Module-level handoff between the Streamlit script thread and the WebRTC worker
 # thread: st.session_state is not readable from the worker, so the live settings
 # object is parked here instead.
@@ -764,188 +710,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Tabs
-# ─────────────────────────────────────────────────────────────────────────────
-# Presentation Slides
-# ─────────────────────────────────────────────────────────────────────────────
-# Slide deck for the class presentation, kept as data (SLIDES) + a small
-# renderer below, so content can be edited without touching the render logic.
-# Each slide is a dict:
-#   "title"        — shown as a big heading
-#   "body"         — markdown for the bullet content
-#   "figure"       — optional (filename, missing_label) tuple, reuses
-#                    show_exported_figure() so a missing figures/ folder
-#                    degrades to the same friendly notice as the Compare tab
-#   "figure_width" — optional, passed through to show_exported_figure()
-SLIDES = [
-    {
-        "title": "♻️ Smart Waste AI Classification System",
-        "body": """
-### AI-Based Smart Waste Classification Using Computer Vision
-
-**BMCS2074 Artificial Intelligence — Assignment Presentation**
-
-Lee Hao Ming · Goh Jian Hao · Kyra Aerin Leong
-202605 Session
-""",
-    },
-    {
-        "title": "The Problem",
-        "body": """
-- Recycling is one of the most effective ways to reduce environmental pollution — but it depends on correct sorting
-- Current sorting relies on manual identification, which is inconsistent and error-prone
-- Misclassified recyclables get contaminated or end up in landfill anyway
-- **Our idea:** use computer vision to classify a waste photo automatically and guide disposal
-""",
-    },
-    {
-        "title": "Objectives",
-        "body": """
-- Develop an AI-based smart waste classification system for 4 recyclable categories
-- Preprocess a waste-image dataset (resizing, normalization, augmentation)
-- Implement and compare **multiple deep learning approaches** under one common experiment
-- Evaluate models with Accuracy, Precision, Recall and F1-score
-- Propose and evaluate a **feature-level fusion** approach combining task-specific CNN features with general-purpose CLIP features
-""",
-    },
-    {
-        "title": "Dataset",
-        "body": """
-- Combined **two public Kaggle datasets** (Garbage Classification + Garbage Classification 12-Classes) to get more images and more visual variation
-- Kept only 4 recyclable categories: **Glass · Metal · Paper · Plastic**
-- Manually checked and removed exact-duplicate images across the merged sets
-- Stratified **70 / 15 / 15** split, fixed once as CSV files and reused by every model:
-  - 3,940 training images
-  - 844 validation images
-  - 845 test images
-""",
-    },
-    {
-        "title": "Five Approaches, One Test Set",
-        "body": """
-Every model below is evaluated on the **same fixed 845-image test split**:
-
-| Approach | Idea |
-|---|---|
-| **CNN** | Custom convolutional network trained from scratch — our baseline |
-| **MobileNetV2** | Lightweight pretrained backbone, fine-tuned |
-| **ResNet50** | Deeper pretrained backbone, fine-tuned |
-| **CLIP (Linear Probe)** | Frozen CLIP visual features + a small trained classifier head |
-| **Feature Fusion (ResNet50 + CLIP)** | Combines task-specific ResNet50 features with general-purpose CLIP features |
-
-Plus an optional **CLIP Verify** step: for CNN / MobileNetV2 / ResNet50, low-confidence predictions (below a fixed 90% threshold) get double-checked by the CLIP Linear Probe.
-""",
-    },
-    {
-        "title": "Results — Overall Test Accuracy",
-        "body": "Every number here comes from evaluating each model's *actual deployed file* on the same 845-image test set.",
-        "figure": ("fig1_overall_accuracy.png", "Overall accuracy chart"),
-        "figure_width": 700,
-    },
-    {
-        "title": "Results — Where Each Model Struggles",
-        "body": "Confusion matrices show which waste types get mixed up with which — the diagonal is correct, everything off it is a specific error mode.",
-        "figure": ("fig3_confusion_matrices.png", "Confusion matrix chart"),
-    },
-    {
-        "title": "Does CLIP Verify Actually Help?",
-        "body": """
-- CLIP Verify re-checks predictions the base model isn't confident about
-- On this benchmark test set, it did **not** improve accuracy for any of the three models it was tried on
-- Kept in the app anyway — as an experiment users can toggle on real-world photos, not a claimed accuracy win
-""",
-        "figure": ("fig8_clip_verify_effect.png", "CLIP Verify comparison chart"),
-    },
-    {
-        "title": "Achievements",
-        "body": """
-- Built a working end-to-end waste-classification prototype, deployed on Streamlit Community Cloud
-- Implemented and fairly compared **5 approaches** on one shared test set
-- **ResNet50** reached the highest observed test accuracy (97.16%), with the **Feature Fusion** approach close behind (96.80%)
-- Fusion showed complementary behaviour — slightly stronger on Paper, weaker on Glass/Metal/Plastic vs. ResNet50 alone
-- Evaluated with accuracy, precision, recall, F1, and confusion-matrix error analysis — not just a single headline number
-""",
-    },
-    {
-        "title": "Limitations",
-        "body": """
-- The 90% CLIP-verify confidence threshold was chosen by design, not tuned on the validation set
-- Test set is 845 images — close results (e.g. the 0.36-point ResNet50 vs. Fusion gap) should be read with that in mind
-- Only 4 controlled categories — real-world waste is messier: overlapping items, dirt, damage, mixed non-recyclables
-- Live camera mode classifies **single snapshots**, not a continuous video stream
-- CLIP-verify results were measured on the *same* test set already used for the base models, not a separate holdout
-- Random seed fixed only for ResNet50 and Fusion — not CNN, MobileNetV2, or CLIP Linear Probe
-""",
-    },
-    {
-        "title": "Future Work",
-        "body": """
-- Empirically tune the confidence threshold on the validation set instead of a fixed 90%
-- Expand the dataset — more images, more categories, more real-world lighting/background conditions
-- Re-test CLIP Verify on a genuinely independent holdout set
-- Standardise random seeds across all 5 models for reproducibility
-- Extend toward continuous real-time deployment — e.g. a smart bin on a conveyor belt
-- Compare against other fusion strategies (late fusion, attention-based fusion)
-""",
-    },
-    {
-        "title": "Live Demo",
-        "body": """
-We'll now switch to the app itself:
-
-1. **🏠 Home** — upload a photo, pick a model, see the classification
-2. **📹 Live** — real-time webcam classification with a framing guide and Grad-CAM
-3. **📊 Compare** — the full metrics behind the charts you just saw
-
-*(Switching tabs now.)*
-""",
-    },
-    {
-        "title": "Thank You",
-        "body": """
-### Questions?
-
-**Lee Hao Ming · Goh Jian Hao · Kyra Aerin Leong**
-Repo: github.com/hming28/smart-waste-classifier
-""",
-    },
-]
-
-
-tab_slides, tab_home, tab_live, tab_compare, tab_about = st.tabs(
-    ["🎤 Slides", "🏠 Home", "📹 Live", "📊 Compare", "ℹ️ About"]
+tab_home, tab_live, tab_compare, tab_about = st.tabs(
+    ["🏠 Home", "📹 Live", "📊 Compare", "ℹ️ About"]
 )
-
-with tab_slides:
-    if "slide_idx" not in st.session_state:
-        st.session_state.slide_idx = 0
-
-    total_slides = len(SLIDES)
-    # Clamp in case SLIDES shrinks between edits while a session is still open
-    st.session_state.slide_idx = max(0, min(st.session_state.slide_idx, total_slides - 1))
-    current = SLIDES[st.session_state.slide_idx]
-
-    nav_prev, nav_pos, nav_next = st.columns([1, 3, 1])
-    with nav_prev:
-        if st.button("⬅ Prev", disabled=st.session_state.slide_idx == 0, use_container_width=True):
-            st.session_state.slide_idx -= 1
-            st.rerun()
-    with nav_pos:
-        st.markdown(
-            f"<p style='text-align:center; color:gray; padding-top:0.4em;'>"
-            f"Slide {st.session_state.slide_idx + 1} / {total_slides}</p>",
-            unsafe_allow_html=True,
-        )
-    with nav_next:
-        if st.button("Next ➡", disabled=st.session_state.slide_idx == total_slides - 1, use_container_width=True):
-            st.session_state.slide_idx += 1
-            st.rerun()
-
-    st.divider()
-    st.markdown(f"## {current['title']}")
-    st.markdown(current["body"])
-    if current.get("figure"):
-        fig_filename, fig_missing_label = current["figure"]
-        show_exported_figure(fig_filename, fig_missing_label, width=current.get("figure_width", "stretch"))
 
 with tab_home:
     # Left-right layout
@@ -1202,9 +969,6 @@ with tab_live:
                      "models were trained with horizontal-flip augmentation.",
             )
 
-        ice_servers = build_ice_servers()
-        turn_configured = len(ice_servers) > 1
-
         # Push the current widget values to the object the worker thread reads.
         live_model = load_model(MODELS[live_model_name])
         grad_model = get_gradcam_model(live_model_name) if use_gradcam else None
@@ -1237,22 +1001,16 @@ with tab_live:
                     mode=WebRtcMode.SENDRECV,
                     video_frame_callback=live_video_callback,
                     media_stream_constraints={"video": True, "audio": False},
-                    rtc_configuration={"iceServers": ice_servers},
+                    rtc_configuration={
+                        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+                    },
                     async_processing=True,
                 )
                 st.caption(
                     "First start takes a few seconds (camera permission + model "
-                    "warm-up)."
+                    "warm-up). If the stream never connects, your network may be "
+                    "blocking WebRTC — use the snapshot fallback below instead."
                 )
-                if not turn_configured:
-                    st.caption(
-                        "ℹ️ STUN only — no TURN relay configured. This works "
-                        "locally and on most home networks, but a deployed app "
-                        "behind strict NAT may sit on CONNECTING forever. If that "
-                        "happens, use the snapshot fallback below, or add TURN "
-                        "credentials under Settings → Secrets (see "
-                        "build_ice_servers() in app.py)."
-                    )
             else:
                 st.warning(
                     "📹 Live video needs the `streamlit-webrtc` package, which is "
@@ -1315,7 +1073,21 @@ with tab_compare:
             f"(the same .keras/.tflite in this repo) on the same shared {test_n}-image test split."
         )
 
-        # show_exported_figure() is now defined globally (shared with the Slides tab)
+        def show_exported_figure(filename: str, missing_label: str, width="stretch"):
+            """Show a Colab-exported PNG from FIGURES_DIR, or a friendly
+            'not uploaded yet' message instead of crashing if it's missing.
+            width caps the display size — these PNGs are saved at 300dpi from
+            Colab, so shown at "natural" size they'd render huge. Pass an int
+            (pixels), 'stretch' (fill container - default), or 'content'."""
+            path = os.path.join(FIGURES_DIR, filename)
+            if os.path.exists(path):
+                st.image(path, width=width)
+            else:
+                st.info(
+                    f"📊 {missing_label} not available yet — export it from "
+                    f"`04_Visualize_result_model.ipynb` and upload it to this repo as "
+                    f"`{path}` to show it here."
+                )
 
         # --- Overall test accuracy (headline chart, image left / metrics right) ---
         st.markdown("#### Overall Test Accuracy")
