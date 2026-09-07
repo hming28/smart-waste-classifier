@@ -48,8 +48,45 @@ BIN_COLORS = {
     "plastic": "#f39c12",  # yellow/amber bin
 }
 
+# Darker versions of the same four hues, for TEXT on a light background. The
+# bright colours above are tuned for shapes and bars against a dark surface;
+# used as body text on beige they'd be too low-contrast to read from the back
+# of a room (amber especially). Each theme picks which set its accent text uses.
+BIN_TEXT_DARK = {
+    "glass": "#1a7a45",
+    "metal": "#1c5f8f",
+    "paper": "#7333a0",
+    "plastic": "#a1650a",
+}
+
 THEMES = {
-    # Default. Dark slate base so the four bin colours stay legible and loud.
+    # Default. Warm beige "recycled paper" surface — easy on the eyes, and it
+    # survives a washed-out projector far better than a dark background does.
+    # "accent_mode" picks which of the two colour sets above is used for TEXT.
+    "beige": {
+        "bg": "linear-gradient(155deg, #faf6ed 0%, #f4eee0 55%, #efe8da 100%)",
+        "text": "#33302a",
+        "muted": "#777064",
+        "strong": "#1a1814",
+        "surface": "rgba(90, 72, 42, .065)",
+        "border": "rgba(90, 72, 42, .16)",
+        "watermark": "rgba(90, 72, 42, .05)",
+        "img_bg": "#ffffff",
+        "accent_mode": "dark",
+    },
+    # Cooler light option, if beige reads too warm on your projector.
+    "recycle_light": {
+        "bg": "linear-gradient(155deg, #f8fbf9 0%, #eff4f1 55%, #eaf0f4 100%)",
+        "text": "#1d2b26",
+        "muted": "#5d7169",
+        "strong": "#0f1a16",
+        "surface": "rgba(0, 0, 0, .04)",
+        "border": "rgba(0, 0, 0, .11)",
+        "watermark": "rgba(0, 0, 0, .045)",
+        "img_bg": "#ffffff",
+        "accent_mode": "dark",
+    },
+    # Original dark slate version, kept as an option.
     "recycle": {
         "bg": "linear-gradient(155deg, #14231f 0%, #10201c 40%, #131d26 100%)",
         "text": "#eef4f0",
@@ -59,17 +96,7 @@ THEMES = {
         "border": "rgba(255, 255, 255, .10)",
         "watermark": "rgba(255, 255, 255, .028)",
         "img_bg": "#ffffff",
-    },
-    # Light alternative — better on a washed-out projector or a bright room.
-    "recycle_light": {
-        "bg": "linear-gradient(155deg, #f7faf8 0%, #eef4f0 55%, #e9f0f4 100%)",
-        "text": "#1d2b26",
-        "muted": "#5d7169",
-        "strong": "#0f1a16",
-        "surface": "rgba(0, 0, 0, .035)",
-        "border": "rgba(0, 0, 0, .09)",
-        "watermark": "rgba(0, 0, 0, .030)",
-        "img_bg": "#ffffff",
+        "accent_mode": "bright",
     },
     # Cooler, more "engineering report" feel; same accent colours.
     "midnight": {
@@ -81,10 +108,11 @@ THEMES = {
         "border": "rgba(255, 255, 255, .10)",
         "watermark": "rgba(255, 255, 255, .026)",
         "img_bg": "#ffffff",
+        "accent_mode": "bright",
     },
 }
 
-ACTIVE_THEME = "recycle"
+ACTIVE_THEME = "beige"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -251,9 +279,16 @@ SLIDES = [
         """
         + SORTING_COMPARISON_SVG
         + """
+            <ul>
+              <li>Recycling is one of the most effective ways to cut pollution &mdash; but it only
+                  works if waste is <b>sorted correctly</b>.</li>
+              <li>Sorting today relies on <b>manual identification and public knowledge</b>, both
+                  inconsistent and error-prone.</li>
+              <li>Misclassified recyclables get <b>contaminated</b>, and end up in landfill anyway.</li>
+            </ul>
             <div class="callout">
-              One wrong item can contaminate a whole stream. The bin on the left doesn't know
-              what's in it &mdash; so everything in it gets treated as landfill.
+              <b>Our approach:</b> use computer vision to classify a waste photo automatically,
+              and tell the user which bin it belongs in.
             </div>
         """,
     },
@@ -408,13 +443,13 @@ SLIDES = [
         "title": "Future Work",
         "body": """
             <ul>
-              <li>Tune the confidence threshold empirically on the validation set.</li>
-              <li>Expand the dataset &mdash; more images, more categories, more real-world lighting and backgrounds.</li>
-              <li>Re-test CLIP Verify on a genuinely independent holdout set.</li>
-              <li>Standardise random seeds across all five models, and report mean &plusmn; std over repeated runs.</li>
-              <li>Close the loop back to IoT &mdash; put this model on the bin itself, classifying
+              <li><b>Tune the confidence threshold</b> empirically on the validation set.</li>
+              <li><b>Expand the dataset</b> &mdash; more images, more categories, more real-world lighting and backgrounds.</li>
+              <li>Re-test CLIP Verify on a genuinely <b>independent holdout set</b>.</li>
+              <li><b>Standardise random seeds</b> across all five models, and report mean &plusmn; std over repeated runs.</li>
+              <li><b>Close the loop back to IoT</b> &mdash; put this model on the bin itself, classifying
                   items continuously instead of one snapshot at a time.</li>
-              <li>Compare against other fusion strategies &mdash; late fusion, attention-based fusion.</li>
+              <li>Compare against <b>other fusion strategies</b> &mdash; late fusion, attention-based fusion.</li>
             </ul>
         """,
     },
@@ -442,9 +477,18 @@ def _figure_data_uri(filename):
         return None
 
 
-def _build_slide_html(slide, index):
-    """Render one slide dict into its <section> markup."""
-    accent = BIN_COLORS.get(slide.get("accent", "glass"), BIN_COLORS["glass"])
+def _build_slide_html(slide, index, theme):
+    """Render one slide dict into its <section> markup.
+
+    Two accent vars are set: --accent for shapes/rules/borders (always the
+    bright bin colour) and --accent-text for bold text, which switches to a
+    darker shade on light themes so it stays readable."""
+    accent_name = slide.get("accent", "glass")
+    accent = BIN_COLORS.get(accent_name, BIN_COLORS["glass"])
+    if THEMES[theme].get("accent_mode") == "dark":
+        accent_text = BIN_TEXT_DARK.get(accent_name, BIN_TEXT_DARK["glass"])
+    else:
+        accent_text = accent
 
     classes = "slide"
     if slide.get("layout") == "title":
@@ -454,7 +498,7 @@ def _build_slide_html(slide, index):
 
     parts = [
         '<section class="' + classes + '" data-index="' + str(index)
-        + '" style="--accent:' + accent + '">'
+        + '" style="--accent:' + accent + ';--accent-text:' + accent_text + '">'
     ]
     parts.append('<div class="slide-inner">')
 
@@ -521,21 +565,21 @@ def _build_css(theme):
     z-index: 0;
   }}
 
-  /* Four-colour ribbon down the left edge — the deck's recycling signature. */
-  .deck::before {{
-    content: "";
-    position: absolute; left: 0; top: 0; bottom: 0; width: 7px; z-index: 4;
-    background: linear-gradient(180deg,
-      var(--glass) 0%, var(--glass) 25%,
-      var(--metal) 25%, var(--metal) 50%,
-      var(--paper) 50%, var(--paper) 75%,
-      var(--plastic) 75%, var(--plastic) 100%);
-  }}
+  /* Four-colour ribbon removed — the per-slide accent carries the recycling
+     identity on its own, without eating horizontal space. */
 
+  /* Flex column with auto margins on the inner block: content sits centred
+     vertically at any deck height. This is what fixes fullscreen — the deck
+     grows to 100vh, and without centring everything stayed pinned to the top
+     with a large dead area underneath. Auto margins (rather than
+     justify-content: center) also mean a slide taller than the viewport still
+     scrolls from its top instead of having the top clipped off. */
   .slide {{
     position: absolute;
     inset: 0;
-    padding: 42px 58px 74px 68px;
+    display: flex;
+    flex-direction: column;
+    padding: 42px 58px 74px;
     opacity: 0;
     visibility: hidden;
     transform: translateY(14px);
@@ -544,9 +588,19 @@ def _build_css(theme):
     z-index: 1;
   }}
   .slide.active {{ opacity: 1; visibility: visible; transform: none; }}
-  .slide-inner {{ max-width: 1000px; margin: 0 auto; }}
+  .slide-inner {{ max-width: 1000px; width: 100%; margin: auto; }}
 
-  .slide-title {{ display: flex; align-items: center; justify-content: center; text-align: center; }}
+  /* Fullscreen: scale type up for projector distance. */
+  .deck:fullscreen .slide {{ padding: 54px 84px 84px; }}
+  .deck:fullscreen .slide-inner {{ max-width: 1240px; }}
+  .deck:fullscreen h1 {{ font-size: 3rem; }}
+  .deck:fullscreen .slide-title h1 {{ font-size: 4.6rem; }}
+  .deck:fullscreen .content {{ font-size: 1.35rem; }}
+  .deck:fullscreen .note {{ font-size: 1.15rem; }}
+  .deck:fullscreen .kicker {{ font-size: .95rem; }}
+  .deck:fullscreen .figure img {{ max-height: 56vh; }}
+
+  .slide-title {{ text-align: center; }}
   .slide-title h1 {{ font-size: 3.5rem; border: none; padding: 0; margin-bottom: .5rem; }}
   .slide-title .kicker {{ justify-content: center; }}
 
@@ -565,7 +619,9 @@ def _build_css(theme):
   ul {{ padding-left: 20px; margin: 0 0 14px; }}
   li {{ margin-bottom: 10px; }}
   li::marker {{ color: var(--accent); }}
-  b {{ color: var(--strong); font-weight: 700; }}
+  /* Bold takes the slide's accent colour — key terms read as highlights
+     rather than just heavier text, which is much easier to scan. */
+  b {{ color: var(--accent-text); font-weight: 700; }}
   .lead {{ font-size: 1.35rem; color: var(--text); margin: 0 0 16px; }}
   .team {{ font-size: 1.05rem; color: var(--muted); margin: 18px 0 0; }}
   .note {{ font-size: .95rem; color: var(--muted); margin: 8px 0 12px; }}
@@ -625,14 +681,13 @@ def _build_css(theme):
 
   /* Click zones — left edge goes back, right edge goes forward. */
   .zone {{ position: absolute; top: 0; bottom: 58px; width: 20%; cursor: pointer; z-index: 2; }}
-  .zone-prev {{ left: 7px; }}
+  .zone-prev {{ left: 0; }}
   .zone-next {{ right: 0; }}
 
   .bar {{
     position: absolute; left: 0; right: 0; bottom: 0; height: 58px; z-index: 5;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 22px 0 30px; gap: 16px;
-    background: linear-gradient(to top, rgba(0, 0, 0, .30), transparent);
+    padding: 0 22px; gap: 16px;
   }}
   .dots {{ display: flex; gap: 7px; flex-wrap: wrap; }}
   .dot {{
@@ -730,7 +785,7 @@ _DECK_JS = """
 def build_deck_html(theme=None):
     """Assemble the whole deck into one HTML string."""
     theme = theme or ACTIVE_THEME
-    slides_html = "".join(_build_slide_html(s, i) for i, s in enumerate(SLIDES))
+    slides_html = "".join(_build_slide_html(s, i, theme) for i, s in enumerate(SLIDES))
 
     dots_html = ""
     for i, slide in enumerate(SLIDES):
