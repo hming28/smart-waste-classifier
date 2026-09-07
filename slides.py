@@ -73,6 +73,8 @@ THEMES = {
         "watermark": "rgba(90, 72, 42, .05)",
         "img_bg": "#ffffff",
         "accent_mode": "dark",
+        "pos": "#1a7a45",
+        "neg": "#c0392b",
     },
     # Cooler light option, if beige reads too warm on your projector.
     "recycle_light": {
@@ -85,6 +87,8 @@ THEMES = {
         "watermark": "rgba(0, 0, 0, .045)",
         "img_bg": "#ffffff",
         "accent_mode": "dark",
+        "pos": "#1a7a45",
+        "neg": "#c0392b",
     },
     # Original dark slate version, kept as an option.
     "recycle": {
@@ -97,6 +101,8 @@ THEMES = {
         "watermark": "rgba(255, 255, 255, .028)",
         "img_bg": "#ffffff",
         "accent_mode": "bright",
+        "pos": "#4ade80",
+        "neg": "#f87171",
     },
     # Cooler, more "engineering report" feel; same accent colours.
     "midnight": {
@@ -109,6 +115,8 @@ THEMES = {
         "watermark": "rgba(255, 255, 255, .026)",
         "img_bg": "#ffffff",
         "accent_mode": "bright",
+        "pos": "#4ade80",
+        "neg": "#f87171",
     },
 }
 
@@ -336,12 +344,13 @@ SLIDES = [
             <p class="note">Each class is colour-coded to its recycling bin &mdash; the same colours
             the app uses when it gives disposal guidance:</p>
             <div class="bins">
-              <div class="bin bin-glass"><span class="bin-icon">&#127870;</span><span class="bin-name">Glass</span><span class="bin-where">Green bin</span></div>
-              <div class="bin bin-metal"><span class="bin-icon">&#129387;</span><span class="bin-name">Metal</span><span class="bin-where">Metal recycling</span></div>
-              <div class="bin bin-paper"><span class="bin-icon">&#128196;</span><span class="bin-name">Paper</span><span class="bin-where">Blue bin</span></div>
-              <div class="bin bin-plastic"><span class="bin-icon">&#129508;</span><span class="bin-name">Plastic</span><span class="bin-where">Yellow bin</span></div>
+              <div class="bin bin-glass"><span class="bin-icon">&#127870;</span><span class="bin-name">Glass</span><span class="bin-where">Green bin &middot; 1,147 imgs</span></div>
+              <div class="bin bin-metal"><span class="bin-icon">&#129387;</span><span class="bin-name">Metal</span><span class="bin-where">Metal recycling &middot; 1,210</span></div>
+              <div class="bin bin-paper"><span class="bin-icon">&#128196;</span><span class="bin-name">Paper</span><span class="bin-where">Blue bin &middot; 1,726</span></div>
+              <div class="bin bin-plastic"><span class="bin-icon">&#129508;</span><span class="bin-name">Plastic</span><span class="bin-where">Yellow bin &middot; 1,546</span></div>
             </div>
-            <p class="note">Stratified 70 / 15 / 15 split, fixed once as CSV files and reused by every model:</p>
+            <p class="note">Stratified <b>70 / 15 / 15</b> split across <b>5,629 images</b>, fixed once as
+            CSV files and reused by every model &mdash; so all five are judged on identical data:</p>
             <div class="stats">
               <div class="stat"><span class="stat-num">3,940</span><span class="stat-label">Training</span></div>
               <div class="stat"><span class="stat-num">844</span><span class="stat-label">Validation</span></div>
@@ -377,16 +386,64 @@ SLIDES = [
         "body": """
             <p class="note">Every number comes from evaluating each model's <i>actual deployed file</i>
             on the shared 845-image test set.</p>
+            <p class="note">The five models fall into <b>three tiers</b>, not a clean five-way ranking:</p>
+            <div class="tiers">
+              <div class="tier">
+                <span class="tier-score">97.16 / 96.80%</span>
+                <span class="tier-body">
+                  <span class="tier-name">ResNet50 &amp; Feature Fusion</span>
+                  <span class="tier-note">Separated by 0.36 pp &mdash; that's 3 images out of 845.</span>
+                </span>
+              </div>
+              <div class="tier">
+                <span class="tier-score">92.66%</span>
+                <span class="tier-body">
+                  <span class="tier-name">MobileNetV2</span>
+                  <span class="tier-note">Clearly behind the top pair, but far smaller and faster.</span>
+                </span>
+              </div>
+              <div class="tier">
+                <span class="tier-score">90.65 / 90.41%</span>
+                <span class="tier-body">
+                  <span class="tier-name">CLIP Linear Probe &amp; CNN</span>
+                  <span class="tier-note">Separated by 0.24 pp &mdash; 2 images. Effectively tied.</span>
+                </span>
+              </div>
+            </div>
+            <ul>
+              <li><b>Pretraining is what matters most.</b> ResNet50 beats our from-scratch CNN by
+                  <b>6.75 pp</b> &mdash; the single biggest gap in the whole study.</li>
+              <li><b>CLIP never saw a waste image</b> during training, yet its frozen features match
+                  a CNN trained directly on our data.</li>
+              <li>Gaps inside a tier are <b>too small to rank</b> on 845 images &mdash; we report them
+                  as an observed advantage on this split, not a verdict.</li>
+            </ul>
         """,
         "figure": "fig1_overall_accuracy.png",
     },
     {
         "kicker": "Results",
         "accent": "plastic",
-        "title": "Where Each Model Struggles",
+        "title": "The Errors Are Not Random",
         "body": """
-            <p class="note">The diagonal is correct predictions &mdash; everything off it is a specific
-            error mode, which tells us far more than a single accuracy number.</p>
+            <p class="note">The diagonal is correct predictions. What's off it turns out to be the
+            same mistake in every model:</p>
+            <ul>
+              <li><b>Paper is easiest</b> for every model &mdash; matte, opaque, printed texture gives
+                  stable visual features.</li>
+              <li><b>Glass and Plastic are hardest</b>, in <b>every</b> architecture. They're
+                  transparent and reflective, so what the model sees depends on the background and
+                  lighting behind the item.</li>
+              <li>The biggest single error is <b>directional</b>, not a symmetric mix-up:
+                  <b>Glass predicted as Plastic</b> &mdash; from 6 images in ResNet50 up to 25 in the
+                  CLIP Linear Probe. The reverse error is always smaller.</li>
+              <li>Half of ResNet50's <b>most confident</b> errors come from Glass alone &mdash; so it
+                  isn't just uncertainty, the model is sometimes <b>confidently wrong</b>.</li>
+            </ul>
+            <div class="callout">
+              Because the pattern shows up in the weakest and the strongest model alike, it points at
+              the <b>materials</b>, not the architecture.
+            </div>
         """,
         "figure": "fig3_confusion_matrices.png",
     },
@@ -395,13 +452,68 @@ SLIDES = [
         "accent": "paper",
         "title": "Does CLIP Verify Actually Help?",
         "body": """
+            <p class="note">When the primary model's confidence falls below 90%, the prediction is
+            handed to the CLIP Linear Probe instead. The effect <b>depends entirely on which model
+            you start from</b>:</p>
+            <table>
+              <tr>
+                <th>Primary model</th>
+                <th class="num">Standalone</th>
+                <th class="num">Gated</th>
+                <th class="num">Change</th>
+              </tr>
+              <tr>
+                <td>CNN</td><td class="num">90.41%</td><td class="num">92.43%</td>
+                <td class="num"><span class="up">+2.02 pp</span></td>
+              </tr>
+              <tr>
+                <td>MobileNetV2</td><td class="num">92.66%</td><td class="num">94.32%</td>
+                <td class="num"><span class="up">+1.66 pp</span></td>
+              </tr>
+              <tr class="highlight">
+                <td>ResNet50</td><td class="num">97.16%</td><td class="num">96.21%</td>
+                <td class="num"><span class="down">&minus;0.95 pp</span></td>
+              </tr>
+            </table>
             <ul>
-              <li>CLIP Verify re-checks predictions the base model isn't confident about (below 90%).</li>
-              <li>On this benchmark test set it did <b>not</b> improve accuracy for any of the three models.</li>
-              <li>Kept in the app as an experiment for real-world photos &mdash; not claimed as an accuracy win.</li>
+              <li>It <b>helps the weaker models</b> &mdash; their low-confidence predictions really were
+                  often wrong, so CLIP had room to correct them.</li>
+              <li>It <b>hurts the strongest model</b>. ResNet50 unsure is still usually more right than
+                  CLIP, so replacing those predictions loses accuracy.</li>
+              <li>Crucially, <b>no gated combination beats ResNet50 alone</b> (97.16%) &mdash; verification
+                  raises the weak models, but never the ceiling.</li>
             </ul>
+            <div class="callout">
+              <b>The lesson:</b> adding a second model is not automatically an improvement. It has to be
+              better <i>precisely where the first one is unsure</i>.
+            </div>
         """,
         "figure": "fig8_clip_verify_effect.png",
+    },
+    {
+        "kicker": "Results",
+        "accent": "metal",
+        "title": "Is the Fusion Model Actually Better?",
+        "body": """
+            <p class="note">Our proposed approach came second on raw accuracy. But accuracy at one
+            fixed threshold isn't the whole picture:</p>
+            <ul>
+              <li>On <b>ROC / AUC</b>, fusion is the <b>strongest overall</b>: highest for Paper
+                  (<b>1.000</b>) and Plastic (<b>0.997</b>), tied on Glass (0.994), and behind on Metal
+                  by just 0.001.</li>
+              <li>It beat ResNet50's <b>Paper F1</b> (0.990 vs 0.987) while losing on Glass, Metal and
+                  Plastic &mdash; <b>complementary</b> behaviour, not uniformly better or worse.</li>
+              <li>Why? CLIP was trained on general internet images, so it helps for classes with a
+                  strong everyday visual concept like paper, and helps less where the decision needs
+                  <b>fine-grained material texture</b> &mdash; exactly what ResNet50's filters already learn.</li>
+            </ul>
+            <div class="callout">
+              <b>Our honest conclusion:</b> feature-level fusion is <b>technically feasible and trains
+              stably</b>, and it produces genuinely different error patterns &mdash; but on this dataset it
+              is a <b>trade-off, not a clear win</b>.
+            </div>
+        """,
+        "figure": "fig4_roc_curves.png",
     },
     {
         "kicker": "Conclusion",
@@ -409,16 +521,21 @@ SLIDES = [
         "title": "Achievements",
         "body": """
             <ul>
-              <li>Built a working end-to-end prototype, deployed on Streamlit Community Cloud.</li>
-              <li>Implemented and fairly compared <b>5 approaches</b> on one shared test set.</li>
-              <li>Evaluated with accuracy, precision, recall, F1 and confusion-matrix error analysis.</li>
-              <li>Fusion showed <b>complementary</b> behaviour &mdash; slightly stronger on Paper,
-                  weaker on Glass / Metal / Plastic than ResNet50 alone.</li>
+              <li>Built a <b>working end-to-end prototype</b>, deployed on Streamlit Community Cloud.</li>
+              <li>Implemented and fairly compared <b>five approaches</b> on one shared test set &mdash;
+                  same split, same preprocessing, same evaluation.</li>
+              <li>Went beyond headline accuracy: <b>per-class F1, confusion matrices, ROC/AUC</b> and
+                  a confident-error analysis.</li>
+              <li>Identified a <b>reproducible failure mode</b> (Glass &rarr; Plastic) present in every
+                  architecture, and explained <b>why</b> it happens.</li>
+              <li>Showed feature-level fusion is <b>feasible</b>, and reported the trade-off honestly
+                  rather than claiming a win.</li>
             </ul>
             <div class="stats">
               <div class="stat"><span class="stat-num">97.16%</span><span class="stat-label">ResNet50 &mdash; best</span></div>
               <div class="stat"><span class="stat-num">96.80%</span><span class="stat-label">Feature Fusion</span></div>
-              <div class="stat"><span class="stat-num">92.66%</span><span class="stat-label">MobileNetV2</span></div>
+              <div class="stat"><span class="stat-num">5</span><span class="stat-label">Models compared</span></div>
+              <div class="stat"><span class="stat-num">845</span><span class="stat-label">Shared test images</span></div>
             </div>
         """,
     },
@@ -428,12 +545,17 @@ SLIDES = [
         "title": "Limitations",
         "body": """
             <ul>
-              <li>The 90% CLIP-verify threshold was a design choice, <b>not tuned</b> on the validation set.</li>
-              <li>845 test images &mdash; close results (the 0.36-point ResNet50 vs. Fusion gap) should be read with that in mind.</li>
-              <li>Only 4 categories under controlled conditions; real waste is dirtier, overlapping and mixed.</li>
+              <li>The 90% threshold was a <b>design choice, not tuned</b> on the validation set &mdash;
+                  a different cutoff could change the CLIP Verify result entirely.</li>
+              <li><b>845 test images</b> is small: the 0.36 pp top-pair gap is 3 images, so we can't
+                  claim one model is definitively better.</li>
+              <li>Only <b>4 categories under controlled conditions</b>; real waste is dirty, damaged,
+                  overlapping and mixed with non-recyclables.</li>
               <li>Classification runs on a <b>single snapshot</b>, not a continuous video stream.</li>
-              <li>CLIP-verify results were measured on the <i>same</i> test set as the base models, not a separate holdout.</li>
-              <li>Random seed fixed only for ResNet50 and Fusion &mdash; not CNN, MobileNetV2 or CLIP Linear Probe.</li>
+              <li>CLIP Verify was measured on the <b>same test set</b> as the base models &mdash; an
+                  exploratory secondary analysis, not a clean holdout result.</li>
+              <li><b>Seeds fixed only for ResNet50 and Fusion</b>, so CNN, MobileNetV2 and CLIP Linear
+                  Probe figures are single runs and not exactly reproducible.</li>
             </ul>
         """,
     },
@@ -444,7 +566,8 @@ SLIDES = [
         "body": """
             <ul>
               <li><b>Tune the confidence threshold</b> empirically on the validation set.</li>
-              <li><b>Expand the dataset</b> &mdash; more images, more categories, more real-world lighting and backgrounds.</li>
+              <li><b>Expand the dataset</b> &mdash; more images, more categories, and more real-world
+                  lighting and backgrounds, targeting the <b>Glass / Plastic confusion</b> directly.</li>
               <li>Re-test CLIP Verify on a genuinely <b>independent holdout set</b>.</li>
               <li><b>Standardise random seeds</b> across all five models, and report mean &plusmn; std over repeated runs.</li>
               <li><b>Close the loop back to IoT</b> &mdash; put this model on the bin itself, classifying
@@ -543,6 +666,8 @@ def _build_css(theme):
     --metal: {BIN_COLORS['metal']};
     --paper: {BIN_COLORS['paper']};
     --plastic: {BIN_COLORS['plastic']};
+    --pos: {t['pos']};
+    --neg: {t['neg']};
     position: relative;
     height: 700px;
     border-radius: 18px;
@@ -634,6 +759,34 @@ def _build_css(theme):
     border-left: 4px solid var(--accent);
     border-radius: 0 10px 10px 0; font-size: 1rem;
   }}
+
+  table {{ width: 100%; border-collapse: collapse; font-size: 1rem; margin: 6px 0 10px; }}
+  th {{
+    text-align: left; padding: 9px 12px;
+    color: var(--accent-text); font-size: .76rem;
+    letter-spacing: .1em; text-transform: uppercase;
+    border-bottom: 2px solid var(--accent);
+  }}
+  td {{ padding: 9px 12px; border-bottom: 1px solid var(--border); }}
+  th.num, td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+  tr.highlight td {{ background: var(--surface); font-weight: 700; }}
+  .up {{ color: var(--pos); font-weight: 700; }}
+  .down {{ color: var(--neg); font-weight: 700; }}
+
+  /* Grouped result bands — the three performance tiers. */
+  .tiers {{ display: flex; flex-direction: column; gap: 9px; margin: 12px 0; }}
+  .tier {{
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 11px 17px; border-radius: 10px;
+    background: var(--surface); border-left: 4px solid var(--accent);
+  }}
+  .tier-score {{
+    font-size: 1.2rem; font-weight: 700; color: var(--accent-text);
+    min-width: 104px; font-variant-numeric: tabular-nums;
+  }}
+  .tier-body {{ flex: 1; }}
+  .tier-name {{ font-weight: 700; color: var(--strong); }}
+  .tier-note {{ font-size: .9rem; color: var(--muted); }}
 
   .chips {{ display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0; }}
   .chips-center {{ justify-content: center; }}
