@@ -613,9 +613,13 @@ def _build_slide_html(slide, index, theme):
     else:
         accent_text = accent
 
+    has_figure = bool(slide.get("figure"))
+
     classes = "slide"
     if slide.get("layout") == "title":
         classes += " slide-title"
+    if has_figure:
+        classes += " has-figure"
     if index == 0:
         classes += " active"
 
@@ -625,22 +629,31 @@ def _build_slide_html(slide, index, theme):
     ]
     parts.append('<div class="slide-inner">')
 
+    # With a figure the slide splits into two columns, so the heading and body
+    # get wrapped in their own column rather than sitting above the chart.
+    if has_figure:
+        parts.append('<div class="split-text">')
+
     if slide.get("kicker"):
         parts.append('<div class="kicker"><span class="kicker-dot"></span>' + slide["kicker"] + "</div>")
     parts.append("<h1>" + slide["title"] + "</h1>")
     parts.append('<div class="content">' + slide.get("body", "") + "</div>")
 
-    if slide.get("figure"):
+    if has_figure:
+        parts.append("</div>")  # /split-text
         uri = _figure_data_uri(slide["figure"])
         if uri:
-            parts.append('<div class="figure"><img src="' + uri + '" alt="' + slide["figure"] + '"></div>')
+            parts.append(
+                '<div class="split-fig"><img src="' + uri
+                + '" alt="' + slide["figure"] + '"></div>'
+            )
         else:
             parts.append(
-                '<div class="figure missing">Figure <code>'
+                '<div class="split-fig"><div class="figure missing">Figure <code>'
                 + os.path.join(FIGURES_DIR, slide["figure"])
                 + "</code> not found &mdash; export it from "
                 "<code>04_Visualize_result_model.ipynb</code> and commit it to the repo."
-                "</div>"
+                "</div></div>"
             )
 
     parts.append("</div></section>")
@@ -714,6 +727,52 @@ def _build_css(theme):
   }}
   .slide.active {{ opacity: 1; visibility: visible; transform: none; }}
   .slide-inner {{ max-width: 1000px; width: 100%; margin: auto; }}
+
+  /* Slides that carry a chart use a two-column layout: text on the left,
+     figure on the right, both sized to the slide instead of stacking. Stacked
+     vertically these slides overflowed and forced scrolling to reach the
+     chart, which is useless mid-presentation. min-height: 0 on the flex
+     children is what lets them actually shrink to fit rather than pushing
+     past the bottom edge. */
+  .slide.has-figure {{ overflow: hidden; }}
+  .slide.has-figure .slide-inner {{
+    display: flex; flex-direction: row; align-items: stretch;
+    gap: 30px; max-width: 1440px; height: 100%; margin: 0 auto;
+  }}
+  .split-text {{
+    flex: 1 1 50%; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column;
+    /* "safe" centring: centres when there's room, but falls back to top
+       alignment when the column overflows, instead of clipping the heading
+       off the top. Browsers without support drop this and default to
+       flex-start, which is the same safe behaviour. */
+    justify-content: safe center;
+  }}
+  .split-fig {{
+    flex: 1 1 50%; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }}
+  .split-fig img {{
+    max-width: 100%; max-height: 100%;
+    width: auto; height: auto; object-fit: contain;
+    border-radius: 10px; background: {t['img_bg']}; padding: 10px;
+  }}
+  /* Figure slides run a little tighter so the text column fits without scrolling. */
+  .slide.has-figure .content {{ font-size: 1rem; line-height: 1.52; }}
+  .slide.has-figure h1 {{ font-size: 1.95rem; margin-bottom: 14px; }}
+  .slide.has-figure li {{ margin-bottom: 7px; }}
+  .slide.has-figure .tier {{ padding: 8px 14px; }}
+  .slide.has-figure table {{ font-size: .93rem; }}
+  .slide.has-figure td, .slide.has-figure th {{ padding: 6px 9px; }}
+  .deck:fullscreen .slide.has-figure .content {{ font-size: 1.2rem; }}
+  .deck:fullscreen .slide.has-figure h1 {{ font-size: 2.5rem; }}
+
+  /* Narrow viewport (phone / small window): stack instead of squeezing. */
+  @media (max-width: 900px) {{
+    .slide.has-figure {{ overflow-y: auto; }}
+    .slide.has-figure .slide-inner {{ flex-direction: column; height: auto; margin: auto; }}
+    .split-fig img {{ max-height: 300px; }}
+  }}
 
   /* Fullscreen: scale type up for projector distance. */
   .deck:fullscreen .slide {{ padding: 54px 84px 84px; }}
