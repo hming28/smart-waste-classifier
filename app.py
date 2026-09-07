@@ -395,7 +395,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Tabs
-tab_home, tab_compare, tab_about = st.tabs(["🏠 Home", "📊 Compare", "ℹ️ About"])
+tab_home, tab_compare, tab_about, tab_slides = st.tabs(["🏠 Home", "📊 Compare", "ℹ️ About", "🎤 Slides"])
 
 with tab_home:
     # Left-right layout
@@ -728,3 +728,7 @@ with tab_about:
     ### Team
     Built for AI Course Assignment
     """)
+
+
+with tab_slides:
+    render_slides()
