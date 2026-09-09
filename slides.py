@@ -253,6 +253,53 @@ SLIDES = [
         """,
     },
     {
+        "kicker": "Background",
+        "accent": "paper",
+        "title": "Five Eras of Computer Vision",
+        "body": """
+            <p class="note">The five approaches we compare aren't five random choices &mdash;
+            each is a different generation of image-recognition technique, put on the same
+            845-image test set:</p>
+            <div class="timeline">
+              <div class="tl-item">
+                <span class="tl-dot"></span>
+                <span class="tl-year">1998</span>
+                <span class="tl-name">CNN</span>
+                <span class="tl-note">Convolutional networks &mdash; our from-scratch baseline</span>
+              </div>
+              <div class="tl-item">
+                <span class="tl-dot"></span>
+                <span class="tl-year">2015</span>
+                <span class="tl-name">ResNet50</span>
+                <span class="tl-note">Microsoft &mdash; residual connections enable very deep nets</span>
+              </div>
+              <div class="tl-item">
+                <span class="tl-dot"></span>
+                <span class="tl-year">2018</span>
+                <span class="tl-name">MobileNetV2</span>
+                <span class="tl-note">Google &mdash; lightweight, built for phones and edge devices</span>
+              </div>
+              <div class="tl-item">
+                <span class="tl-dot"></span>
+                <span class="tl-year">2021</span>
+                <span class="tl-name">CLIP</span>
+                <span class="tl-note">OpenAI &mdash; learned from image&ndash;text pairs across the web</span>
+              </div>
+              <div class="tl-item featured">
+                <span class="tl-dot"></span>
+                <span class="tl-year">Ours</span>
+                <span class="tl-name">Feature Fusion</span>
+                <span class="tl-note">Combines ResNet50's task-specific view with CLIP's general one</span>
+              </div>
+            </div>
+            <div class="callout">
+              <b>Why it matters:</b> if a newer or pretrained model wins, that tells us something
+              different than if our own from-scratch CNN wins &mdash; the comparison is really a test
+              of <i>which era of technique</i> fits this problem best.
+            </div>
+        """,
+    },
+    {
         "kicker": "Objectives",
         "accent": "metal",
         "title": "Five Objectives",
@@ -827,6 +874,28 @@ STATIC_CSS = """
     color: #fff; font-size: .6rem; font-weight: 800; letter-spacing: .1em;
     padding: 3px 9px; border-radius: 999px;
   }
+
+  /* Horizontal model-history timeline */
+  .timeline { position: relative; display: flex; margin: 10px 0 6px; padding-top: 8px; }
+  .timeline::before {
+    content: ""; position: absolute; left: 4%; right: 4%; top: 27px;
+    height: 2px; background: var(--border);
+  }
+  .tl-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    text-align: center; gap: 5px; position: relative; padding: 0 4px;
+  }
+  .tl-dot {
+    width: 15px; height: 15px; border-radius: 50%; background: var(--accent);
+    margin-bottom: 2px; position: relative; z-index: 1;
+  }
+  .tl-item.featured .tl-dot {
+    width: 20px; height: 20px; background: var(--strong);
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+  .tl-year { font-size: .72rem; font-weight: 800; letter-spacing: .05em; color: var(--accent-text); }
+  .tl-name { font-weight: 800; color: var(--strong); font-size: .93rem; }
+  .tl-note { font-size: .78rem; color: var(--muted); line-height: 1.35; }
 
   /* Numbered process flow */
   .steps { display: flex; flex-direction: column; gap: 0; margin: 4px 0 10px; }
