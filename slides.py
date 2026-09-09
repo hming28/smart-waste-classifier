@@ -895,8 +895,8 @@ STATIC_CSS = """
   /* Fusion diagram */
   .probe-strip {
     display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
-    background: var(--surface-alt); border-radius: 10px; padding: 9px 14px;
-    font-size: .85rem; margin-bottom: 10px;
+    background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; font-size: .85rem; margin-bottom: 10px; box-shadow: var(--shadow);
   }
   .probe-note {
     margin-left: auto; background: var(--accent); color: #fff; font-size: .75rem;
