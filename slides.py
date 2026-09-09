@@ -17,8 +17,19 @@ Usage in app.py:
     with tab_slides:
         render_slides()
 
-To change the look, set ACTIVE_THEME below to any key in THEMES.
+To change the look, set ACTIVE_THEME to any key in THEMES.
 To edit content, edit the SLIDES list.
+
+Layout components available inside a slide "body" (all styled in STATIC_CSS):
+    .cards / .card        numbered feature cards, .card.featured for the highlight
+    .steps / .step        numbered vertical process flow with connectors
+    .splitbar             proportional stacked bar (e.g. train/val/test)
+    .rows / .row          comparison rows with a type pill and role column
+    .arch / .arch-col     side-by-side architecture columns with flow boxes
+    .fusion               dual-branch fusion diagram
+    .tri / .tri-col       three-column summary (achievements/limitations/next)
+    .banner               full-width closing statement
+    .tiers / .tier        ranked result bands
 """
 
 import base64
@@ -30,104 +41,89 @@ import streamlit.components.v1 as components
 # Same folder the Compare tab reads its exported Colab charts from.
 FIGURES_DIR = "figures"
 
-# Height of the deck component in pixels. Raise this if your slides get taller.
+# Height of the deck component in pixels.
 DECK_HEIGHT = 720
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Themes
 # ─────────────────────────────────────────────────────────────────────────────
-# The four bin colours are the same ones RECYCLE_INFO uses in app.py, so the
-# deck, the app UI and the physical bin colours all agree. Each slide picks one
-# of them as its accent, which is what makes the deck read as "recycling"
-# rather than just "green".
+# The four bin colours match RECYCLE_INFO in app.py, so the deck, the app UI and
+# the physical bin colours all agree.
 BIN_COLORS = {
-    "glass": "#2ecc71",    # green bin
-    "metal": "#3498db",    # blue bin
-    "paper": "#9b59b6",    # purple bin
-    "plastic": "#f39c12",  # yellow/amber bin
+    "glass": "#2ecc71",
+    "metal": "#3498db",
+    "paper": "#9b59b6",
+    "plastic": "#f39c12",
 }
 
-# Darker versions of the same four hues, for TEXT on a light background. The
-# bright colours above are tuned for shapes and bars against a dark surface;
-# used as body text on beige they'd be too low-contrast to read from the back
-# of a room (amber especially). Each theme picks which set its accent text uses.
+# Darker versions for TEXT on a light background — the bright set above is tuned
+# for shapes, and amber especially is unreadable as body text on beige.
 BIN_TEXT_DARK = {
-    "glass": "#1a7a45",
+    "glass": "#12684a",
     "metal": "#1c5f8f",
     "paper": "#7333a0",
-    "plastic": "#a1650a",
+    "plastic": "#96600a",
 }
 
 THEMES = {
-    # Default. Warm beige "recycled paper" surface — easy on the eyes, and it
-    # survives a washed-out projector far better than a dark background does.
-    # "accent_mode" picks which of the two colour sets above is used for TEXT.
+    # Default: clean off-white with deep green ink, in the style of a printed
+    # report. Survives a washed-out projector far better than a dark deck.
+    "paper": {
+        "bg": "linear-gradient(160deg, #fbfcfb 0%, #f6f8f6 55%, #f2f6f4 100%)",
+        "text": "#2b3330",
+        "muted": "#6d7a75",
+        "strong": "#0f3b2c",
+        "surface": "#ffffff",
+        "surface_alt": "rgba(18, 104, 74, .07)",
+        "border": "rgba(20, 60, 45, .13)",
+        "watermark": "rgba(18, 104, 74, .035)",
+        "img_bg": "#ffffff",
+        "shadow": "0 2px 10px rgba(20, 60, 45, .07)",
+        "accent_mode": "dark",
+        "pos": "#12684a",
+        "neg": "#b03030",
+    },
+    # Warmer paper tone.
     "beige": {
-        "bg": "linear-gradient(155deg, #faf6ed 0%, #f4eee0 55%, #efe8da 100%)",
+        "bg": "linear-gradient(155deg, #faf6ed 0%, #f5efe2 55%, #f1ebde 100%)",
         "text": "#33302a",
         "muted": "#777064",
         "strong": "#1a1814",
-        "surface": "rgba(90, 72, 42, .065)",
-        "border": "rgba(90, 72, 42, .16)",
+        "surface": "#fffdf8",
+        "surface_alt": "rgba(90, 72, 42, .075)",
+        "border": "rgba(90, 72, 42, .17)",
         "watermark": "rgba(90, 72, 42, .05)",
         "img_bg": "#ffffff",
+        "shadow": "0 2px 10px rgba(90, 72, 42, .08)",
         "accent_mode": "dark",
         "pos": "#1a7a45",
         "neg": "#c0392b",
     },
-    # Cooler light option, if beige reads too warm on your projector.
-    "recycle_light": {
-        "bg": "linear-gradient(155deg, #f8fbf9 0%, #eff4f1 55%, #eaf0f4 100%)",
-        "text": "#1d2b26",
-        "muted": "#5d7169",
-        "strong": "#0f1a16",
-        "surface": "rgba(0, 0, 0, .04)",
-        "border": "rgba(0, 0, 0, .11)",
-        "watermark": "rgba(0, 0, 0, .045)",
-        "img_bg": "#ffffff",
-        "accent_mode": "dark",
-        "pos": "#1a7a45",
-        "neg": "#c0392b",
-    },
-    # Original dark slate version, kept as an option.
+    # Dark option.
     "recycle": {
         "bg": "linear-gradient(155deg, #14231f 0%, #10201c 40%, #131d26 100%)",
         "text": "#eef4f0",
         "muted": "#93aaa1",
         "strong": "#ffffff",
         "surface": "rgba(255, 255, 255, .055)",
-        "border": "rgba(255, 255, 255, .10)",
+        "surface_alt": "rgba(255, 255, 255, .085)",
+        "border": "rgba(255, 255, 255, .12)",
         "watermark": "rgba(255, 255, 255, .028)",
         "img_bg": "#ffffff",
-        "accent_mode": "bright",
-        "pos": "#4ade80",
-        "neg": "#f87171",
-    },
-    # Cooler, more "engineering report" feel; same accent colours.
-    "midnight": {
-        "bg": "linear-gradient(155deg, #0e1626 0%, #111a2b 45%, #0d1a22 100%)",
-        "text": "#e8eef7",
-        "muted": "#8fa3bd",
-        "strong": "#ffffff",
-        "surface": "rgba(255, 255, 255, .05)",
-        "border": "rgba(255, 255, 255, .10)",
-        "watermark": "rgba(255, 255, 255, .026)",
-        "img_bg": "#ffffff",
+        "shadow": "none",
         "accent_mode": "bright",
         "pos": "#4ade80",
         "neg": "#f87171",
     },
 }
 
-ACTIVE_THEME = "beige"
+ACTIVE_THEME = "paper"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Inline illustrations
 # ─────────────────────────────────────────────────────────────────────────────
-# Drawn as SVG rather than loaded as photos so the deck stays self-contained —
-# no extra files to commit, nothing to break if figures/ is missing.
 
 def _bin_svg(x, color, label, lid_open=False):
     """One wheelie-bin shape at horizontal offset x."""
@@ -146,105 +142,49 @@ def _bin_svg(x, color, label, lid_open=False):
 
 
 SORTING_COMPARISON_SVG = f"""
-<svg viewBox="0 0 900 210" xmlns="http://www.w3.org/2000/svg" class="illus">
-  <!-- LEFT: everything in one bin -->
-  <text x="20" y="18" font-size="14" font-weight="700" fill="#e74c3c">&#10007; &nbsp;Without classification</text>
-  <g transform="translate(60,26)" color="currentColor">
-    {_bin_svg(0, "#7f8c8d", "One mixed bin", lid_open=True)}
+<svg viewBox="0 0 900 205" xmlns="http://www.w3.org/2000/svg" class="illus">
+  <text x="20" y="16" font-size="14" font-weight="700" fill="#c0392b">&#10007; &nbsp;Without classification</text>
+  <g transform="translate(64,24)" color="currentColor">
+    {_bin_svg(0, "#8a9490", "One mixed bin", lid_open=True)}
     <circle cx="18" cy="14" r="7" fill="{BIN_COLORS['glass']}"/>
     <rect x="32" y="6" width="13" height="13" rx="2" fill="{BIN_COLORS['plastic']}"/>
     <circle cx="58" cy="12" r="6" fill="{BIN_COLORS['metal']}"/>
     <rect x="44" y="18" width="12" height="9" rx="2" fill="{BIN_COLORS['paper']}"/>
   </g>
-  <text x="52" y="196" font-size="12.5" fill="#e74c3c" opacity=".9">
-    Recyclables get contaminated &#8594; landfill
-  </text>
-
-  <line x1="330" y1="34" x2="330" y2="180" stroke="currentColor" stroke-opacity=".16" stroke-width="1.5"/>
-
-  <!-- RIGHT: sorted into four -->
-  <text x="380" y="18" font-size="14" font-weight="700" fill="#2ecc71">&#10003; &nbsp;With AI classification</text>
-  <g transform="translate(380,26)" color="currentColor">
+  <text x="46" y="192" font-size="12.5" fill="#c0392b">Contaminated &#8594; landfill</text>
+  <line x1="330" y1="30" x2="330" y2="176" stroke="currentColor" stroke-opacity=".15" stroke-width="1.5"/>
+  <text x="380" y="16" font-size="14" font-weight="700" fill="#12684a">&#10003; &nbsp;With AI classification</text>
+  <g transform="translate(380,24)" color="currentColor">
     {_bin_svg(0, BIN_COLORS['glass'], "Glass")}
     {_bin_svg(115, BIN_COLORS['metal'], "Metal")}
     {_bin_svg(230, BIN_COLORS['paper'], "Paper")}
     {_bin_svg(345, BIN_COLORS['plastic'], "Plastic")}
   </g>
-  <text x="380" y="196" font-size="12.5" fill="#2ecc71" opacity=".9">
-    Clean streams &#8594; actually recycled
-  </text>
+  <text x="380" y="192" font-size="12.5" fill="#12684a">Clean streams &#8594; actually recycled</text>
 </svg>
 """
 
 
 IOT_UPGRADE_SVG = f"""
-<svg viewBox="0 0 880 132" xmlns="http://www.w3.org/2000/svg" class="illus">
-  <!-- BEFORE -->
-  <rect x="4" y="14" width="330" height="104" rx="12"
-        fill="currentColor" fill-opacity=".05" stroke="currentColor" stroke-opacity=".16"/>
-  <text x="24" y="42" font-size="12" font-weight="700" fill="currentColor" opacity=".55"
+<svg viewBox="0 0 880 128" xmlns="http://www.w3.org/2000/svg" class="illus">
+  <rect x="4" y="12" width="330" height="104" rx="12"
+        fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".15"/>
+  <text x="24" y="40" font-size="11.5" font-weight="700" fill="currentColor" opacity=".5"
         letter-spacing="1.6">PREVIOUS IoT PROJECT</text>
-  <text x="24" y="70" font-size="17" font-weight="700" fill="currentColor">Wet / Dry waste bin</text>
-  <text x="24" y="94" font-size="13" fill="currentColor" opacity=".65">2 categories &#183; no camera</text>
-  <text x="24" y="112" font-size="13" fill="currentColor" opacity=".65">Bin decides by hardware</text>
-
-  <!-- ARROW -->
-  <line x1="352" y1="66" x2="510" y2="66" stroke="{BIN_COLORS['glass']}" stroke-width="2.5"/>
-  <polygon points="510,60 524,66 510,72" fill="{BIN_COLORS['glass']}"/>
-  <text x="368" y="52" font-size="12.5" font-weight="700" fill="{BIN_COLORS['glass']}">
-    give it eyes
-  </text>
-
-  <!-- AFTER -->
-  <rect x="540" y="14" width="336" height="104" rx="12"
-        fill="{BIN_COLORS['glass']}" fill-opacity=".10"
-        stroke="{BIN_COLORS['glass']}" stroke-opacity=".45"/>
-  <text x="560" y="42" font-size="12" font-weight="700" fill="{BIN_COLORS['glass']}"
+  <text x="24" y="68" font-size="17" font-weight="700" fill="currentColor">Wet / Dry waste bin</text>
+  <text x="24" y="91" font-size="13" fill="currentColor" opacity=".62">2 categories &#183; no camera</text>
+  <text x="24" y="109" font-size="13" fill="currentColor" opacity=".62">Bin decides by hardware</text>
+  <line x1="352" y1="64" x2="508" y2="64" stroke="var(--accent)" stroke-width="2.5"/>
+  <polygon points="508,58 522,64 508,70" fill="var(--accent)"/>
+  <text x="374" y="50" font-size="12.5" font-weight="700" fill="var(--accent-text)">give it eyes</text>
+  <rect x="540" y="12" width="336" height="104" rx="12"
+        fill="var(--accent)" fill-opacity=".09"
+        stroke="var(--accent)" stroke-opacity=".45"/>
+  <text x="560" y="40" font-size="11.5" font-weight="700" fill="var(--accent-text)"
         letter-spacing="1.6">THIS PROJECT</text>
-  <text x="560" y="70" font-size="17" font-weight="700" fill="currentColor">Computer vision classifier</text>
-  <text x="560" y="94" font-size="13" fill="currentColor" opacity=".75">4 categories &#183; camera input</text>
-  <text x="560" y="112" font-size="13" fill="currentColor" opacity=".75">Bin decides by what it sees</text>
-</svg>
-"""
-
-
-MODEL_TIMELINE_SVG = f"""
-<svg viewBox="0 0 900 172" xmlns="http://www.w3.org/2000/svg" class="illus">
-  <line x1="40" y1="96" x2="860" y2="96" stroke="currentColor" stroke-opacity=".18" stroke-width="2"/>
-
-  <g>
-    <circle cx="90" cy="96" r="9" fill="{BIN_COLORS['glass']}"/>
-    <text x="90" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">CNN</text>
-    <text x="90" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">1998 &#8594;</text>
-    <text x="90" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">from scratch</text>
-  </g>
-  <g>
-    <circle cx="280" cy="96" r="9" fill="{BIN_COLORS['metal']}"/>
-    <text x="280" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">ResNet50</text>
-    <text x="280" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">2015</text>
-    <text x="280" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">Microsoft</text>
-  </g>
-  <g>
-    <circle cx="470" cy="96" r="9" fill="{BIN_COLORS['paper']}"/>
-    <text x="470" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">MobileNetV2</text>
-    <text x="470" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">2018</text>
-    <text x="470" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">Google &#183; built for phones</text>
-  </g>
-  <g>
-    <circle cx="660" cy="96" r="9" fill="{BIN_COLORS['plastic']}"/>
-    <text x="660" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">CLIP</text>
-    <text x="660" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">2021</text>
-    <text x="660" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">OpenAI &#183; learned from the web</text>
-  </g>
-  <g>
-    <circle cx="840" cy="96" r="12" fill="none" stroke="{BIN_COLORS['glass']}" stroke-width="3"/>
-    <circle cx="840" cy="96" r="5" fill="{BIN_COLORS['glass']}"/>
-    <text x="840" y="70" text-anchor="middle" font-size="13" font-weight="700"
-          fill="{BIN_COLORS['glass']}">Fusion</text>
-    <text x="840" y="122" text-anchor="middle" font-size="12"
-          fill="{BIN_COLORS['glass']}" opacity=".85">ours</text>
-    <text x="840" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">ResNet50 + CLIP</text>
-  </g>
+  <text x="560" y="68" font-size="17" font-weight="700" fill="currentColor">Computer vision classifier</text>
+  <text x="560" y="91" font-size="13" fill="currentColor" opacity=".72">4 categories &#183; camera input</text>
+  <text x="560" y="109" font-size="13" fill="currentColor" opacity=".72">Bin decides by what it sees</text>
 </svg>
 """
 
@@ -252,13 +192,13 @@ MODEL_TIMELINE_SVG = f"""
 # ─────────────────────────────────────────────────────────────────────────────
 # Slide content
 # ─────────────────────────────────────────────────────────────────────────────
-# Each slide is a dict:
+# Each slide dict:
 #   "title"   — heading
-#   "kicker"  — optional small section label above the title
-#   "accent"  — which bin colour this slide uses (glass/metal/paper/plastic)
+#   "kicker"  — section label; auto-prefixed with the slide number
+#   "accent"  — bin colour used for rules, numbers and bold text
 #   "body"    — HTML content
-#   "figure"  — optional PNG filename inside FIGURES_DIR, embedded as base64
-#   "layout"  — optional; "title" for the big centred cover slide
+#   "figure"  — optional PNG in FIGURES_DIR; puts the slide in two-column mode
+#   "layout"  — "title" for the centred cover slide
 
 SLIDES = [
     {
@@ -278,16 +218,12 @@ SLIDES = [
         """,
     },
     {
-        "kicker": "Introduction",
+        "kicker": "The Problem",
         "accent": "plastic",
-        "title": "The Problem",
-        "body": """
-            <p class="note">Recycling only works if waste is sorted correctly &mdash; and today that
-            sorting depends on manual identification and public knowledge.</p>
-        """
-        + SORTING_COMPARISON_SVG
+        "title": "Sorting Is the Bottleneck",
+        "body": SORTING_COMPARISON_SVG
         + """
-            <ul>
+            <ul class="tight">
               <li>Recycling is one of the most effective ways to cut pollution &mdash; but it only
                   works if waste is <b>sorted correctly</b>.</li>
               <li>Sorting today relies on <b>manual identification and public knowledge</b>, both
@@ -301,7 +237,7 @@ SLIDES = [
         """,
     },
     {
-        "kicker": "Introduction",
+        "kicker": "Background",
         "accent": "glass",
         "title": "Where This Came From",
         "body": IOT_UPGRADE_SVG
@@ -317,66 +253,234 @@ SLIDES = [
         """,
     },
     {
-        "kicker": "Introduction",
+        "kicker": "Objectives",
         "accent": "metal",
-        "title": "Objectives",
+        "title": "Five Objectives",
         "body": """
-            <ul>
-              <li>Develop an AI-based waste classification system for <b>4 recyclable categories</b>.</li>
-              <li>Preprocess the dataset &mdash; resizing, normalization, augmentation.</li>
-              <li>Implement and compare <b>multiple deep learning approaches</b> under one common experiment.</li>
-              <li>Evaluate using Accuracy, Precision, Recall and F1-score.</li>
-              <li>Propose and evaluate a <b>feature-level fusion</b> approach combining task-specific
-                  CNN features with general-purpose CLIP features.</li>
-            </ul>
+            <div class="cards">
+              <div class="card">
+                <span class="card-num">1</span>
+                <span class="card-title">BUILD</span>
+                <span class="card-desc">An AI classification system for four recyclable classes</span>
+              </div>
+              <div class="card">
+                <span class="card-num">2</span>
+                <span class="card-title">PREPARE</span>
+                <span class="card-desc">Resize, normalise and augment the waste dataset</span>
+              </div>
+              <div class="card">
+                <span class="card-num">3</span>
+                <span class="card-title">COMPARE</span>
+                <span class="card-desc">Deep-learning algorithms, evaluated head-to-head</span>
+              </div>
+              <div class="card">
+                <span class="card-num">4</span>
+                <span class="card-title">EVALUATE</span>
+                <span class="card-desc">Accuracy, precision, recall and F1-score</span>
+              </div>
+              <div class="card featured">
+                <span class="badge">PROPOSED</span>
+                <span class="card-num">5</span>
+                <span class="card-title">FUSE</span>
+                <span class="card-desc">ResNet50 + CLIP feature-level fusion</span>
+              </div>
+            </div>
+            <p class="note center">Objectives map directly to report Section 1.3.</p>
         """,
     },
     {
-        "kicker": "Methodology",
+        "kicker": "Proposed System",
+        "accent": "glass",
+        "title": "One Pipeline &mdash; Five Models",
+        "body": """
+            <div class="steps">
+              <div class="step"><span class="step-num">1</span>Merge two Kaggle garbage datasets</div>
+              <div class="step"><span class="step-num">2</span>Fixed stratified 70/15/15 split (CSV)</div>
+              <div class="step"><span class="step-num">3</span>Preprocess + augment training data</div>
+              <div class="step"><span class="step-num">4</span>Train five models</div>
+              <div class="step"><span class="step-num">5</span>Evaluate on the same 845 test images</div>
+              <div class="step"><span class="step-num">6</span>Deploy prototype (Streamlit + TFLite)</div>
+            </div>
+            <div class="callout">
+              The split is written to CSV <b>once</b> and reused by every model, so all five are
+              judged on <b>identical data</b> &mdash; that's what makes the comparison fair.
+            </div>
+        """,
+    },
+    {
+        "kicker": "Dataset",
         "accent": "paper",
-        "title": "Dataset",
+        "title": "5,629 Images, Four Classes",
         "body": """
-            <ul>
-              <li>Combined <b>two public Kaggle datasets</b> (Garbage Classification + Garbage
-                  Classification 12-Classes) for more images and more visual variation.</li>
-              <li>Kept only the 4 recyclable categories, and removed exact duplicates across the merge.</li>
-            </ul>
-            <p class="note">Each class is colour-coded to its recycling bin &mdash; the same colours
-            the app uses when it gives disposal guidance:</p>
+            <p class="note">Two public Kaggle datasets merged for more images and more visual
+            variation, reduced to the four recyclable categories, with exact duplicates removed.</p>
             <div class="bins">
-              <div class="bin bin-glass"><span class="bin-icon">&#127870;</span><span class="bin-name">Glass</span><span class="bin-where">Green bin &middot; 1,147 imgs</span></div>
-              <div class="bin bin-metal"><span class="bin-icon">&#129387;</span><span class="bin-name">Metal</span><span class="bin-where">Metal recycling &middot; 1,210</span></div>
-              <div class="bin bin-paper"><span class="bin-icon">&#128196;</span><span class="bin-name">Paper</span><span class="bin-where">Blue bin &middot; 1,726</span></div>
-              <div class="bin bin-plastic"><span class="bin-icon">&#129508;</span><span class="bin-name">Plastic</span><span class="bin-where">Yellow bin &middot; 1,546</span></div>
+              <div class="bin bin-glass"><span class="bin-name">Glass</span><span class="bin-count">1,147</span><span class="bin-where">Green bin</span></div>
+              <div class="bin bin-metal"><span class="bin-name">Metal</span><span class="bin-count">1,210</span><span class="bin-where">Metal recycling</span></div>
+              <div class="bin bin-paper"><span class="bin-name">Paper</span><span class="bin-count">1,726</span><span class="bin-where">Blue bin</span></div>
+              <div class="bin bin-plastic"><span class="bin-name">Plastic</span><span class="bin-count">1,546</span><span class="bin-where">Yellow bin</span></div>
             </div>
-            <p class="note">Stratified <b>70 / 15 / 15</b> split across <b>5,629 images</b>, fixed once as
-            CSV files and reused by every model &mdash; so all five are judged on identical data:</p>
-            <div class="stats">
-              <div class="stat"><span class="stat-num">3,940</span><span class="stat-label">Training</span></div>
-              <div class="stat"><span class="stat-num">844</span><span class="stat-label">Validation</span></div>
-              <div class="stat"><span class="stat-num">845</span><span class="stat-label">Test</span></div>
+            <p class="note">Stratified split, fixed once and shared by every model:</p>
+            <div class="splitbar">
+              <div class="seg seg-a" style="flex:70">Train 3,940 &#183; 70%</div>
+              <div class="seg seg-b" style="flex:15">Validation 844 &#183; 15%</div>
+              <div class="seg seg-c" style="flex:15">Test 845 &#183; 15%</div>
+            </div>
+            <p class="note">Paper is both the <b>largest class</b> and the <b>easiest to classify</b>
+            &mdash; worth remembering when we read the per-class results.</p>
+        """,
+    },
+    {
+        "kicker": "Algorithms",
+        "accent": "metal",
+        "title": "The Five Approaches",
+        "body": """
+            <div class="rows">
+              <div class="row">
+                <span class="row-name">CNN</span>
+                <span class="pill">Baseline &mdash; from scratch</span>
+                <span class="row-why">Learns features directly from our images</span>
+                <span class="row-role">Reference point</span>
+              </div>
+              <div class="row">
+                <span class="row-name">MobileNetV2</span>
+                <span class="pill">Transfer learning</span>
+                <span class="row-why">Depthwise separable convolutions keep it light</span>
+                <span class="row-role">Efficient edge deployment</span>
+              </div>
+              <div class="row">
+                <span class="row-name">ResNet50</span>
+                <span class="pill">Transfer learning</span>
+                <span class="row-why">Residual connections, deep feature extraction</span>
+                <span class="row-role">High-accuracy end</span>
+              </div>
+              <div class="row">
+                <span class="row-name">CLIP Linear Probe</span>
+                <span class="pill">Vision-language</span>
+                <span class="row-why">Frozen CLIP encoder + one trained linear layer</span>
+                <span class="row-role">Semantic features + verification</span>
+              </div>
+              <div class="row featured">
+                <span class="badge">PROPOSED</span>
+                <span class="row-name">ResNet50 + CLIP Fusion</span>
+                <span class="pill">Feature-level fusion</span>
+                <span class="row-why">Joins task-specific and general features</span>
+                <span class="row-role">Our combined algorithm</span>
+              </div>
+            </div>
+            <p class="note center">Five eras of computer vision &mdash; 1998 &#8594; 2015 &#8594; 2018
+            &#8594; 2021 &#8594; ours &mdash; on one shared test set.</p>
+        """,
+    },
+    {
+        "kicker": "CNN Family",
+        "accent": "glass",
+        "title": "From Baseline to Deep Transfer Learning",
+        "body": """
+            <div class="arch">
+              <div class="arch-col">
+                <span class="arch-name">CNN</span>
+                <span class="pill">From scratch</span>
+                <div class="flow">
+                  <span class="fbox">Input 224&times;224</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Conv + Pool blocks</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Dense</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Softmax (4 classes)</span>
+                </div>
+                <span class="arch-cfg">Adam &#183; LR 1e-4 &#183; 103 epochs (early stopping)</span>
+                <span class="arch-role">Baseline &mdash; what our data alone can learn</span>
+              </div>
+              <div class="arch-col">
+                <span class="arch-name">MobileNetV2</span>
+                <span class="pill">Transfer learning</span>
+                <div class="flow">
+                  <span class="fbox">ImageNet weights</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Inverted residuals + depthwise conv</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Feature head</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Fine-tune upper layers</span>
+                </div>
+                <span class="arch-cfg">Head 1e-4 &#8594; fine-tune 1e-5 &#183; 85 + 10 epochs</span>
+                <span class="arch-role">Lightweight &mdash; built for mobile and smart bins</span>
+              </div>
+              <div class="arch-col">
+                <span class="arch-name">ResNet50</span>
+                <span class="pill">Transfer learning</span>
+                <div class="flow">
+                  <span class="fbox">ImageNet weights</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Residual (skip) connections</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Global pooling</span>
+                  <span class="farrow">&darr;</span>
+                  <span class="fbox">Fine-tune upper layers</span>
+                </div>
+                <span class="arch-cfg">Head 1e-3 &#8594; fine-tune 1e-5 &#183; 20 + 15 epochs &#183; seed 42</span>
+                <span class="arch-role">Deepest extractor &mdash; the accuracy end</span>
+              </div>
             </div>
         """,
     },
     {
-        "kicker": "Methodology",
+        "kicker": "Proposed Fusion",
         "accent": "metal",
-        "title": "Five Approaches, One Test Set",
+        "title": "Dual-Branch Feature Fusion",
         "body": """
-            <p class="note">These aren't five random choices &mdash; they're five eras of computer
-            vision, put against each other on the same 845 images.</p>
-        """
-        + MODEL_TIMELINE_SVG
-        + """
-            <ul>
-              <li><b>CNN</b> &mdash; the classic approach, trained from scratch on our data only. Our baseline.</li>
-              <li><b>ResNet50 &amp; MobileNetV2</b> &mdash; pretrained on millions of images, then
-                  fine-tuned on ours. One built for accuracy, one built for phones.</li>
-              <li><b>CLIP</b> &mdash; learned from image&ndash;text pairs across the web, so it carries
-                  general knowledge no waste dataset could teach.</li>
-              <li><b>Feature Fusion</b> &mdash; our proposal: combine ResNet50's task-specific features
-                  with CLIP's general ones, and see whether two views beat one.</li>
-            </ul>
+            <div class="probe-strip">
+              <b>CLIP Linear Probe:</b>
+              <span class="fbox sm">image</span><span class="farrow inline">&rarr;</span>
+              <span class="fbox sm">frozen CLIP encoder</span><span class="farrow inline">&rarr;</span>
+              <span class="fbox sm">512-d</span><span class="farrow inline">&rarr;</span>
+              <span class="fbox sm">linear layer &rarr; 4</span>
+              <span class="probe-note">one trained layer reached 90.65%</span>
+            </div>
+            <div class="fusion">
+              <div class="fnode top">Input image &#183; 224&times;224</div>
+              <div class="fsplit">
+                <div class="fbranch">
+                  <span class="farrow">&darr;</span>
+                  <div class="fcard">
+                    <span class="fcard-title">ResNet50 <span class="tag">fine-tuned</span></span>
+                    <span class="fbox sm">2048-d feature</span>
+                    <span class="farrow inline">&rarr;</span>
+                    <span class="fbox sm">dense projection</span>
+                  </div>
+                </div>
+                <div class="fbranch">
+                  <span class="farrow">&darr;</span>
+                  <div class="fcard">
+                    <span class="fcard-title">CLIP image encoder <span class="tag lock">FROZEN</span></span>
+                    <span class="fbox sm">512-d feature</span>
+                  </div>
+                </div>
+              </div>
+              <div class="fsplit arrows">
+                <span class="farrow">&darr;</span>
+                <span class="farrow">&darr;</span>
+              </div>
+              <div class="fnode join">Concatenate &nbsp;&rarr;&nbsp; joint representation</div>
+              <div class="fhead">
+                <b>Classification head:</b>
+                <span class="fbox sm">dense</span><span class="farrow inline">&rarr;</span>
+                <span class="fbox sm">dropout</span><span class="farrow inline">&rarr;</span>
+                <span class="fbox sm">dense</span><span class="farrow inline">&rarr;</span>
+                <span class="fbox sm">softmax</span>
+                <span class="farrow inline">&rarr;</span>
+                <span class="chip chip-glass sm">Glass</span>
+                <span class="chip chip-metal sm">Metal</span>
+                <span class="chip chip-paper sm">Paper</span>
+                <span class="chip chip-plastic sm">Plastic</span>
+              </div>
+            </div>
+            <div class="foot-notes">
+              <span class="fnote">CLIP encoder stays frozen throughout</span>
+              <span class="fnote">Two-phase training: fusion head first, then ResNet50 upper layers at 1e-5</span>
+            </div>
         """,
     },
     {
@@ -384,22 +488,22 @@ SLIDES = [
         "accent": "glass",
         "title": "Overall Test Accuracy",
         "body": """
-            <p class="note">Every number comes from evaluating each model's <i>actual deployed file</i>
-            on the shared 845-image test set.</p>
-            <p class="note">The five models fall into <b>three tiers</b>, not a clean five-way ranking:</p>
+            <p class="note">Every number comes from evaluating each model's <i>actual deployed
+            file</i> on the shared 845-image test set. The five models fall into
+            <b>three tiers</b>, not a clean five-way ranking:</p>
             <div class="tiers">
               <div class="tier">
                 <span class="tier-score">97.16 / 96.80%</span>
                 <span class="tier-body">
                   <span class="tier-name">ResNet50 &amp; Feature Fusion</span>
-                  <span class="tier-note">Separated by 0.36 pp &mdash; that's 3 images out of 845.</span>
+                  <span class="tier-note">Separated by 0.36 pp &mdash; 3 images out of 845.</span>
                 </span>
               </div>
               <div class="tier">
                 <span class="tier-score">92.66%</span>
                 <span class="tier-body">
                   <span class="tier-name">MobileNetV2</span>
-                  <span class="tier-note">Clearly behind the top pair, but far smaller and faster.</span>
+                  <span class="tier-note">Behind the top pair, but far smaller and faster.</span>
                 </span>
               </div>
               <div class="tier">
@@ -410,39 +514,35 @@ SLIDES = [
                 </span>
               </div>
             </div>
-            <ul>
-              <li><b>Pretraining is what matters most.</b> ResNet50 beats our from-scratch CNN by
-                  <b>6.75 pp</b> &mdash; the single biggest gap in the whole study.</li>
-              <li><b>CLIP never saw a waste image</b> during training, yet its frozen features match
-                  a CNN trained directly on our data.</li>
-              <li>Gaps inside a tier are <b>too small to rank</b> on 845 images &mdash; we report them
-                  as an observed advantage on this split, not a verdict.</li>
+            <ul class="tight">
+              <li><b>Pretraining matters most.</b> ResNet50 beats our from-scratch CNN by
+                  <b>6.75 pp</b> &mdash; the biggest gap in the study.</li>
+              <li><b>CLIP never saw a waste image</b>, yet its frozen features match a CNN trained
+                  directly on our data.</li>
             </ul>
         """,
         "figure": "fig1_overall_accuracy.png",
     },
     {
-        "kicker": "Results",
+        "kicker": "Error Analysis",
         "accent": "plastic",
         "title": "The Errors Are Not Random",
         "body": """
-            <p class="note">The diagonal is correct predictions. What's off it turns out to be the
-            same mistake in every model:</p>
-            <ul>
+            <p class="note">Off the diagonal, every model makes the same mistake:</p>
+            <ul class="tight">
               <li><b>Paper is easiest</b> for every model &mdash; matte, opaque, printed texture gives
-                  stable visual features.</li>
-              <li><b>Glass and Plastic are hardest</b>, in <b>every</b> architecture. They're
-                  transparent and reflective, so what the model sees depends on the background and
-                  lighting behind the item.</li>
-              <li>The biggest single error is <b>directional</b>, not a symmetric mix-up:
+                  stable features.</li>
+              <li><b>Glass and Plastic are hardest</b>, in every architecture. Both are transparent
+                  and reflective, so what the model sees depends on the background behind the item.</li>
+              <li>The largest error is <b>directional</b>, not a symmetric mix-up:
                   <b>Glass predicted as Plastic</b> &mdash; from 6 images in ResNet50 up to 25 in the
-                  CLIP Linear Probe. The reverse error is always smaller.</li>
-              <li>Half of ResNet50's <b>most confident</b> errors come from Glass alone &mdash; so it
-                  isn't just uncertainty, the model is sometimes <b>confidently wrong</b>.</li>
+                  CLIP Linear Probe. The reverse is always smaller.</li>
+              <li>Half of ResNet50's <b>most confident</b> errors come from Glass alone &mdash; so the
+                  model is sometimes <b>confidently wrong</b>, not merely uncertain.</li>
             </ul>
             <div class="callout">
-              Because the pattern shows up in the weakest and the strongest model alike, it points at
-              the <b>materials</b>, not the architecture.
+              The pattern appears in the weakest and strongest model alike, so it points at the
+              <b>materials</b>, not the architecture.
             </div>
         """,
         "figure": "fig3_confusion_matrices.png",
@@ -452,39 +552,26 @@ SLIDES = [
         "accent": "paper",
         "title": "Does CLIP Verify Actually Help?",
         "body": """
-            <p class="note">When the primary model's confidence falls below 90%, the prediction is
-            handed to the CLIP Linear Probe instead. The effect <b>depends entirely on which model
-            you start from</b>:</p>
+            <p class="note">Below 90% confidence, the prediction is handed to the CLIP Linear Probe.
+            The effect <b>depends entirely on which model you start from</b>:</p>
             <table>
-              <tr>
-                <th>Primary model</th>
-                <th class="num">Standalone</th>
-                <th class="num">Gated</th>
-                <th class="num">Change</th>
-              </tr>
-              <tr>
-                <td>CNN</td><td class="num">90.41%</td><td class="num">92.43%</td>
-                <td class="num"><span class="up">+2.02 pp</span></td>
-              </tr>
-              <tr>
-                <td>MobileNetV2</td><td class="num">92.66%</td><td class="num">94.32%</td>
-                <td class="num"><span class="up">+1.66 pp</span></td>
-              </tr>
-              <tr class="highlight">
-                <td>ResNet50</td><td class="num">97.16%</td><td class="num">96.21%</td>
-                <td class="num"><span class="down">&minus;0.95 pp</span></td>
-              </tr>
+              <tr><th>Primary model</th><th class="num">Alone</th><th class="num">Gated</th><th class="num">Change</th></tr>
+              <tr><td>CNN</td><td class="num">90.41%</td><td class="num">92.43%</td>
+                  <td class="num"><span class="up">+2.02 pp</span></td></tr>
+              <tr><td>MobileNetV2</td><td class="num">92.66%</td><td class="num">94.32%</td>
+                  <td class="num"><span class="up">+1.66 pp</span></td></tr>
+              <tr class="highlight"><td>ResNet50</td><td class="num">97.16%</td><td class="num">96.21%</td>
+                  <td class="num"><span class="down">&minus;0.95 pp</span></td></tr>
             </table>
-            <ul>
-              <li>It <b>helps the weaker models</b> &mdash; their low-confidence predictions really were
-                  often wrong, so CLIP had room to correct them.</li>
-              <li>It <b>hurts the strongest model</b>. ResNet50 unsure is still usually more right than
-                  CLIP, so replacing those predictions loses accuracy.</li>
-              <li>Crucially, <b>no gated combination beats ResNet50 alone</b> (97.16%) &mdash; verification
-                  raises the weak models, but never the ceiling.</li>
+            <ul class="tight">
+              <li>It <b>helps the weaker models</b> &mdash; their low-confidence predictions really
+                  were often wrong.</li>
+              <li>It <b>hurts the strongest</b>. ResNet50 unsure is still usually more right than CLIP.</li>
+              <li><b>No gated combination beats ResNet50 alone</b> (97.16%) &mdash; verification lifts
+                  the weak models, never the ceiling.</li>
             </ul>
             <div class="callout">
-              <b>The lesson:</b> adding a second model is not automatically an improvement. It has to be
+              <b>The lesson:</b> a second model is not automatically an improvement. It has to be
               better <i>precisely where the first one is unsure</i>.
             </div>
         """,
@@ -495,22 +582,22 @@ SLIDES = [
         "accent": "metal",
         "title": "Is the Fusion Model Actually Better?",
         "body": """
-            <p class="note">Our proposed approach came second on raw accuracy. But accuracy at one
-            fixed threshold isn't the whole picture:</p>
-            <ul>
-              <li>On <b>ROC / AUC</b>, fusion is the <b>strongest overall</b>: highest for Paper
-                  (<b>1.000</b>) and Plastic (<b>0.997</b>), tied on Glass (0.994), and behind on Metal
-                  by just 0.001.</li>
+            <p class="note">Our proposed approach came second on raw accuracy &mdash; but accuracy at
+            one fixed threshold isn't the whole picture:</p>
+            <ul class="tight">
+              <li>On <b>ROC / AUC</b> fusion is <b>strongest overall</b>: highest for Paper
+                  (<b>1.000</b>) and Plastic (<b>0.997</b>), tied on Glass (0.994), behind on Metal
+                  by 0.001.</li>
               <li>It beat ResNet50's <b>Paper F1</b> (0.990 vs 0.987) while losing on Glass, Metal and
-                  Plastic &mdash; <b>complementary</b> behaviour, not uniformly better or worse.</li>
-              <li>Why? CLIP was trained on general internet images, so it helps for classes with a
-                  strong everyday visual concept like paper, and helps less where the decision needs
-                  <b>fine-grained material texture</b> &mdash; exactly what ResNet50's filters already learn.</li>
+                  Plastic &mdash; <b>complementary</b>, not uniformly better or worse.</li>
+              <li>CLIP was trained on general internet images, so it helps where a class has a strong
+                  everyday visual concept, and helps less where the call needs <b>fine-grained
+                  material texture</b> &mdash; what ResNet50 already learns.</li>
             </ul>
             <div class="callout">
-              <b>Our honest conclusion:</b> feature-level fusion is <b>technically feasible and trains
-              stably</b>, and it produces genuinely different error patterns &mdash; but on this dataset it
-              is a <b>trade-off, not a clear win</b>.
+              <b>Our honest conclusion:</b> feature-level fusion is <b>feasible and trains stably</b>,
+              and produces genuinely different error patterns &mdash; but on this dataset it is a
+              <b>trade-off, not a clear win</b>.
             </div>
         """,
         "figure": "fig4_roc_curves.png",
@@ -518,62 +605,45 @@ SLIDES = [
     {
         "kicker": "Conclusion",
         "accent": "glass",
-        "title": "Achievements",
+        "title": "What We Achieved &mdash; and What Comes Next",
         "body": """
-            <ul>
-              <li>Built a <b>working end-to-end prototype</b>, deployed on Streamlit Community Cloud.</li>
-              <li>Implemented and fairly compared <b>five approaches</b> on one shared test set &mdash;
-                  same split, same preprocessing, same evaluation.</li>
-              <li>Went beyond headline accuracy: <b>per-class F1, confusion matrices, ROC/AUC</b> and
-                  a confident-error analysis.</li>
-              <li>Identified a <b>reproducible failure mode</b> (Glass &rarr; Plastic) present in every
-                  architecture, and explained <b>why</b> it happens.</li>
-              <li>Showed feature-level fusion is <b>feasible</b>, and reported the trade-off honestly
-                  rather than claiming a win.</li>
-            </ul>
-            <div class="stats">
-              <div class="stat"><span class="stat-num">97.16%</span><span class="stat-label">ResNet50 &mdash; best</span></div>
-              <div class="stat"><span class="stat-num">96.80%</span><span class="stat-label">Feature Fusion</span></div>
-              <div class="stat"><span class="stat-num">5</span><span class="stat-label">Models compared</span></div>
-              <div class="stat"><span class="stat-num">845</span><span class="stat-label">Shared test images</span></div>
+            <div class="tri">
+              <div class="tri-col col-good">
+                <span class="tri-head">ACHIEVEMENTS</span>
+                <ul>
+                  <li>Working Streamlit prototype deployed</li>
+                  <li>Five approaches on one fixed test set</li>
+                  <li>ResNet50 best: <b>97.16%</b> accuracy</li>
+                  <li>Fusion <b>96.80%</b> &mdash; complementary class behaviour</li>
+                  <li>Class-level error analysis completed</li>
+                </ul>
+              </div>
+              <div class="tri-col col-warn">
+                <span class="tri-head">LIMITATIONS</span>
+                <ul>
+                  <li>Only four categories &#183; <b>845</b> test images</li>
+                  <li>Glass &rarr; Plastic confusion persists</li>
+                  <li>Fixed <b>0.90</b> threshold, not tuned</li>
+                  <li>Single snapshots &mdash; no continuous video</li>
+                  <li>Gating results reused the test set</li>
+                  <li>Seeds fixed for only two of five models</li>
+                </ul>
+              </div>
+              <div class="tri-col col-next">
+                <span class="tri-head">FUTURE WORK</span>
+                <ul>
+                  <li>Larger, more diverse dataset + more classes</li>
+                  <li>Model-specific confidence thresholds</li>
+                  <li>Independent holdout evaluation</li>
+                  <li>Standardise seeds across all five models</li>
+                  <li>Real-time smart-bin / conveyor deployment</li>
+                  <li>Compare late and attention-based fusion</li>
+                </ul>
+              </div>
             </div>
-        """,
-    },
-    {
-        "kicker": "Conclusion",
-        "accent": "plastic",
-        "title": "Limitations",
-        "body": """
-            <ul>
-              <li>The 90% threshold was a <b>design choice, not tuned</b> on the validation set &mdash;
-                  a different cutoff could change the CLIP Verify result entirely.</li>
-              <li><b>845 test images</b> is small: the 0.36 pp top-pair gap is 3 images, so we can't
-                  claim one model is definitively better.</li>
-              <li>Only <b>4 categories under controlled conditions</b>; real waste is dirty, damaged,
-                  overlapping and mixed with non-recyclables.</li>
-              <li>Classification runs on a <b>single snapshot</b>, not a continuous video stream.</li>
-              <li>CLIP Verify was measured on the <b>same test set</b> as the base models &mdash; an
-                  exploratory secondary analysis, not a clean holdout result.</li>
-              <li><b>Seeds fixed only for ResNet50 and Fusion</b>, so CNN, MobileNetV2 and CLIP Linear
-                  Probe figures are single runs and not exactly reproducible.</li>
-            </ul>
-        """,
-    },
-    {
-        "kicker": "Conclusion",
-        "accent": "metal",
-        "title": "Future Work",
-        "body": """
-            <ul>
-              <li><b>Tune the confidence threshold</b> empirically on the validation set.</li>
-              <li><b>Expand the dataset</b> &mdash; more images, more categories, and more real-world
-                  lighting and backgrounds, targeting the <b>Glass / Plastic confusion</b> directly.</li>
-              <li>Re-test CLIP Verify on a genuinely <b>independent holdout set</b>.</li>
-              <li><b>Standardise random seeds</b> across all five models, and report mean &plusmn; std over repeated runs.</li>
-              <li><b>Close the loop back to IoT</b> &mdash; put this model on the bin itself, classifying
-                  items continuously instead of one snapshot at a time.</li>
-              <li>Compare against <b>other fusion strategies</b> &mdash; late fusion, attention-based fusion.</li>
-            </ul>
+            <div class="banner">
+              AI-based image classification can support more consistent recyclable waste identification.
+            </div>
         """,
     },
 ]
@@ -587,15 +657,14 @@ def _figure_data_uri(filename):
     """Read a PNG from FIGURES_DIR and return it as a base64 data URI.
 
     The deck renders inside a sandboxed iframe, which cannot read local files by
-    path, so images have to be inlined. Returns None if the file isn't there,
-    and the slide falls back to a placeholder instead of breaking the deck."""
+    path, so images have to be inlined. Returns None if the file isn't there and
+    the slide falls back to a placeholder rather than breaking the deck."""
     path = os.path.join(FIGURES_DIR, filename)
     if not os.path.exists(path):
         return None
     try:
         with open(path, "rb") as f:
-            encoded = base64.b64encode(f.read()).decode("ascii")
-        return "data:image/png;base64," + encoded
+            return "data:image/png;base64," + base64.b64encode(f.read()).decode("ascii")
     except OSError:
         return None
 
@@ -603,9 +672,9 @@ def _figure_data_uri(filename):
 def _build_slide_html(slide, index, theme):
     """Render one slide dict into its <section> markup.
 
-    Two accent vars are set: --accent for shapes/rules/borders (always the
-    bright bin colour) and --accent-text for bold text, which switches to a
-    darker shade on light themes so it stays readable."""
+    Two accent vars are set: --accent for shapes and rules (always the bright bin
+    colour) and --accent-text for bold text, which switches to a darker shade on
+    light themes so it stays readable."""
     accent_name = slide.get("accent", "glass")
     accent = BIN_COLORS.get(accent_name, BIN_COLORS["glass"])
     if THEMES[theme].get("accent_mode") == "dark":
@@ -614,9 +683,10 @@ def _build_slide_html(slide, index, theme):
         accent_text = accent
 
     has_figure = bool(slide.get("figure"))
+    is_title = slide.get("layout") == "title"
 
     classes = "slide"
-    if slide.get("layout") == "title":
+    if is_title:
         classes += " slide-title"
     if has_figure:
         classes += " has-figure"
@@ -625,18 +695,23 @@ def _build_slide_html(slide, index, theme):
 
     parts = [
         '<section class="' + classes + '" data-index="' + str(index)
-        + '" style="--accent:' + accent + ';--accent-text:' + accent_text + '">'
+        + '" style="--accent:' + accent + ';--accent-text:' + accent_text + '">',
+        '<div class="slide-inner">',
     ]
-    parts.append('<div class="slide-inner">')
 
-    # With a figure the slide splits into two columns, so the heading and body
-    # get wrapped in their own column rather than sitting above the chart.
+    # With a figure the slide splits into two columns, so the heading and body go
+    # in their own column rather than sitting above the chart.
     if has_figure:
         parts.append('<div class="split-text">')
 
     if slide.get("kicker"):
-        parts.append('<div class="kicker"><span class="kicker-dot"></span>' + slide["kicker"] + "</div>")
+        # Section labels are numbered like "04 · PROPOSED SYSTEM"; the cover
+        # slide keeps its plain subtitle instead.
+        label = slide["kicker"] if is_title else f"{index + 1:02d} &#183; {slide['kicker']}"
+        parts.append('<div class="kicker">' + label + "</div>")
     parts.append("<h1>" + slide["title"] + "</h1>")
+    if not is_title:
+        parts.append('<div class="rule"></div>')
     parts.append('<div class="content">' + slide.get("body", "") + "</div>")
 
     if has_figure:
@@ -660,271 +735,344 @@ def _build_slide_html(slide, index, theme):
     return "".join(parts)
 
 
+# Static stylesheet. Kept out of the f-string so CSS braces stay single — only
+# the theme variables below are interpolated.
+STATIC_CSS = """
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+  .deck {
+    position: relative; height: 700px; border-radius: 18px; overflow: hidden;
+    color: var(--text); box-shadow: 0 18px 46px rgba(0,0,0,.22); user-select: none;
+  }
+  .deck:fullscreen { height: 100vh; border-radius: 0; }
+  .deck::after {
+    content: "\\267B"; position: absolute; right: -30px; bottom: -76px;
+    font-size: 300px; line-height: 1; color: var(--watermark); pointer-events: none; z-index: 0;
+  }
+
+  .slide {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding: 40px 56px 70px; opacity: 0; visibility: hidden; transform: translateY(12px);
+    transition: opacity .3s ease, transform .3s ease; overflow-y: auto; z-index: 1;
+  }
+  .slide.active { opacity: 1; visibility: visible; transform: none; }
+  .slide-inner { max-width: 1080px; width: 100%; margin: auto; }
+
+  /* Figure slides: text left, chart right, both sized to the slide. min-height:0
+     is what lets the flex children shrink instead of overflowing the bottom. */
+  .slide.has-figure { overflow: hidden; }
+  .slide.has-figure .slide-inner {
+    display: flex; flex-direction: row; align-items: stretch;
+    gap: 30px; max-width: 1440px; height: 100%; margin: 0 auto;
+  }
+  .split-text {
+    flex: 1 1 50%; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; justify-content: safe center;
+  }
+  .split-fig { flex: 1 1 50%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .split-fig img {
+    max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain;
+    border-radius: 10px; background: var(--img-bg); padding: 10px;
+  }
+  .slide.has-figure .content { font-size: .97rem; line-height: 1.5; }
+  .slide.has-figure h1 { font-size: 1.9rem; }
+  .slide.has-figure li { margin-bottom: 6px; }
+  .slide.has-figure table { font-size: .9rem; }
+  .slide.has-figure td, .slide.has-figure th { padding: 6px 9px; }
+
+  .slide-title { text-align: center; }
+  .slide-title h1 { font-size: 3.6rem; margin-bottom: .4rem; }
+
+  .kicker {
+    font-size: .76rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent-text); margin-bottom: 10px; font-weight: 700;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  h1 { font-size: 2.15rem; line-height: 1.12; margin: 0 0 12px; font-weight: 800; color: var(--strong); }
+  .rule { width: 62px; height: 4px; border-radius: 2px; background: var(--accent); margin-bottom: 20px; }
+  .content { font-size: 1.02rem; line-height: 1.58; }
+  ul { padding-left: 20px; margin: 0 0 12px; }
+  ul.tight li { margin-bottom: 5px; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--accent); }
+  b { color: var(--accent-text); font-weight: 700; }
+  .lead { font-size: 1.3rem; color: var(--text); margin: 0 0 14px; }
+  .team { font-size: 1.02rem; color: var(--muted); margin: 16px 0 0; }
+  .note { font-size: .93rem; color: var(--muted); margin: 6px 0 10px; }
+  .note.center { text-align: center; }
+  .illus { width: 100%; height: auto; margin: 2px 0 8px; color: var(--text); }
+
+  .callout {
+    margin-top: 12px; padding: 12px 17px; background: var(--surface-alt);
+    border-left: 4px solid var(--accent); border-radius: 0 9px 9px 0; font-size: .98rem;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: .98rem; margin: 4px 0 10px; }
+  th {
+    text-align: left; padding: 8px 11px; color: var(--accent-text); font-size: .74rem;
+    letter-spacing: .1em; text-transform: uppercase; border-bottom: 2px solid var(--accent);
+  }
+  td { padding: 8px 11px; border-bottom: 1px solid var(--border); }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.highlight td { background: var(--surface-alt); font-weight: 700; }
+  .up { color: var(--pos); font-weight: 700; }
+  .down { color: var(--neg); font-weight: 700; }
+
+  /* Numbered feature cards */
+  .cards { display: flex; gap: 13px; margin: 6px 0 12px; align-items: stretch; }
+  .card {
+    flex: 1; position: relative; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 13px; padding: 18px 16px 16px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .card.featured { border: 2px solid var(--accent); }
+  .card-num { font-size: 2rem; font-weight: 800; color: var(--accent-text); line-height: 1; }
+  .card-title { font-weight: 800; letter-spacing: .07em; color: var(--strong); font-size: .95rem; }
+  .card-desc { font-size: .87rem; color: var(--muted); line-height: 1.45; }
+  .badge {
+    position: absolute; top: 12px; right: 12px; background: var(--accent);
+    color: #fff; font-size: .6rem; font-weight: 800; letter-spacing: .1em;
+    padding: 3px 9px; border-radius: 999px;
+  }
+
+  /* Numbered process flow */
+  .steps { display: flex; flex-direction: column; gap: 0; margin: 4px 0 10px; }
+  .step {
+    display: flex; align-items: center; gap: 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px; padding: 9px 15px;
+    font-size: .98rem; box-shadow: var(--shadow);
+  }
+  .step + .step { margin-top: 20px; position: relative; }
+  .step + .step::before {
+    content: "\\2193"; position: absolute; left: 26px; top: -19px; height: 18px;
+    color: var(--accent); font-size: .95rem; line-height: 1;
+  }
+  .step-num {
+    flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--surface-alt);
+    color: var(--accent-text); font-weight: 800; font-size: .82rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Proportional split bar */
+  .splitbar { display: flex; border-radius: 9px; overflow: hidden; margin: 6px 0 12px; font-size: .87rem; font-weight: 700; }
+  .seg { padding: 11px 8px; text-align: center; white-space: nowrap; }
+  .seg-a { background: var(--accent); color: #fff; }
+  .seg-b { background: var(--accent); opacity: .62; color: #fff; }
+  .seg-c { background: var(--surface-alt); color: var(--accent-text); }
+
+  /* Comparison rows */
+  .rows { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
+  .row {
+    position: relative; display: grid; grid-template-columns: 1.3fr 1.2fr 1.7fr 1.3fr;
+    align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 11px; padding: 11px 16px; box-shadow: var(--shadow);
+  }
+  .row.featured { border: 2px solid var(--accent); padding-right: 124px; }
+  .row-name { font-weight: 800; color: var(--strong); font-size: 1rem; }
+  .row-why { font-size: .87rem; color: var(--muted); }
+  .row-role { font-size: .88rem; font-weight: 700; color: var(--accent-text); }
+  .pill {
+    display: inline-block; background: var(--surface-alt); color: var(--accent-text);
+    font-size: .78rem; font-weight: 700; padding: 4px 12px; border-radius: 999px;
+    justify-self: start; white-space: nowrap;
+  }
+  .row.featured .badge { top: 50%; transform: translateY(-50%); right: 14px; }
+
+  /* Architecture columns */
+  .arch { display: flex; gap: 14px; align-items: stretch; margin: 2px 0 6px; }
+  .arch-col {
+    flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 13px;
+    padding: 15px 15px 13px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
+  }
+  .arch-name { font-size: 1.15rem; font-weight: 800; color: var(--strong); }
+  .arch-cfg {
+    font-size: .78rem; color: var(--accent-text); background: var(--surface-alt);
+    border-radius: 8px; padding: 7px 10px; font-family: ui-monospace, Menlo, monospace;
+  }
+  .arch-role { font-size: .85rem; font-weight: 700; color: var(--strong); margin-top: auto; }
+  .flow { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+  .fbox {
+    background: var(--surface-alt); border-radius: 8px; padding: 7px 11px;
+    font-size: .84rem; text-align: center; color: var(--text);
+  }
+  .fbox.sm { padding: 4px 9px; font-size: .78rem; display: inline-block; }
+  .farrow { color: var(--accent); text-align: center; font-size: .9rem; line-height: 1.1; }
+  .farrow.inline { display: inline-block; margin: 0 3px; }
+
+  /* Fusion diagram */
+  .probe-strip {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+    background: var(--surface-alt); border-radius: 10px; padding: 9px 14px;
+    font-size: .85rem; margin-bottom: 10px;
+  }
+  .probe-note {
+    margin-left: auto; background: var(--accent); color: #fff; font-size: .75rem;
+    font-weight: 700; padding: 4px 11px; border-radius: 999px;
+  }
+  .fusion { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+  .fnode { text-align: center; font-weight: 700; border-radius: 10px; padding: 9px; }
+  .fnode.top { background: var(--strong); color: #fff; align-self: center; padding: 9px 26px; }
+  .fnode.join { background: var(--accent); color: #fff; font-size: 1.05rem; }
+  .fsplit { display: flex; gap: 14px; }
+  .fsplit.arrows { justify-content: space-around; }
+  .fsplit.arrows .farrow { flex: 1; }
+  .fbranch { flex: 1; display: flex; flex-direction: column; }
+  .fcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 11px;
+    padding: 11px 14px; box-shadow: var(--shadow); flex: 1;
+  }
+  .fcard-title { display: block; font-weight: 800; color: var(--strong); margin-bottom: 7px; font-size: .95rem; }
+  .tag {
+    font-size: .62rem; font-weight: 800; letter-spacing: .08em; padding: 3px 8px;
+    border-radius: 999px; background: var(--surface-alt); color: var(--accent-text);
+  }
+  .tag.lock { background: var(--strong); color: #fff; }
+  .fhead {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: .85rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px;
+  }
+  .foot-notes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .fnote {
+    font-size: .8rem; color: var(--muted); background: var(--surface-alt);
+    border-radius: 8px; padding: 6px 12px;
+  }
+
+  /* Three-column conclusion */
+  .tri { display: flex; gap: 14px; align-items: stretch; margin: 2px 0 12px; }
+  .tri-col {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 13px; padding: 15px 17px; box-shadow: var(--shadow); border-top: 4px solid;
+  }
+  .tri-col ul { padding-left: 17px; margin: 0; }
+  .tri-col li { font-size: .89rem; margin-bottom: 8px; line-height: 1.42; }
+  .tri-head { display: block; font-weight: 800; letter-spacing: .09em; font-size: .82rem; margin-bottom: 11px; }
+  .col-good { border-top-color: var(--glass); }
+  .col-good .tri-head, .col-good li::marker { color: var(--pos); }
+  .col-warn { border-top-color: var(--plastic); }
+  .col-warn .tri-head, .col-warn li::marker { color: #96600a; }
+  .col-next { border-top-color: var(--metal); }
+  .col-next .tri-head, .col-next li::marker { color: #1c5f8f; }
+
+  .banner {
+    background: var(--strong); color: #fff; text-align: center; font-weight: 700;
+    font-size: 1.02rem; padding: 14px; border-radius: 11px;
+  }
+
+  .chips { display: flex; gap: 9px; flex-wrap: wrap; margin: 16px 0; }
+  .chips-center { justify-content: center; }
+  .chip { padding: 6px 18px; border-radius: 999px; font-weight: 700; font-size: .9rem; color: #11201b; }
+  .chip.sm { padding: 3px 11px; font-size: .76rem; }
+  .chip-glass { background: var(--glass); }
+  .chip-metal { background: var(--metal); }
+  .chip-paper { background: var(--paper); color: #fff; }
+  .chip-plastic { background: var(--plastic); }
+
+  .bins { display: flex; gap: 11px; flex-wrap: wrap; margin: 8px 0; }
+  .bin {
+    flex: 1; min-width: 130px; border-radius: 11px; padding: 12px 15px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 4px solid; box-shadow: var(--shadow);
+  }
+  .bin-glass { border-top-color: var(--glass); }
+  .bin-metal { border-top-color: var(--metal); }
+  .bin-paper { border-top-color: var(--paper); }
+  .bin-plastic { border-top-color: var(--plastic); }
+  .bin-name { display: block; font-weight: 800; color: var(--strong); }
+  .bin-count { display: block; font-size: 1.3rem; font-weight: 800; color: var(--accent-text); }
+  .bin-where { display: block; font-size: .8rem; color: var(--muted); }
+
+  .tiers { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+  .tier {
+    display: flex; align-items: baseline; gap: 15px; padding: 10px 15px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+  }
+  .tier-score { font-size: 1.12rem; font-weight: 800; color: var(--accent-text); min-width: 98px; font-variant-numeric: tabular-nums; }
+  .tier-body { flex: 1; }
+  .tier-name { font-weight: 700; color: var(--strong); }
+  .tier-note { font-size: .87rem; color: var(--muted); }
+
+  .figure.missing {
+    padding: 22px; border: 1px dashed var(--accent); border-radius: 12px;
+    color: var(--muted); font-size: .92rem; text-align: left;
+  }
+  code { background: var(--surface-alt); padding: 2px 6px; border-radius: 4px; font-size: .88em; }
+
+  /* Fullscreen: scale type up for projector distance. */
+  .deck:fullscreen .slide { padding: 52px 82px 82px; }
+  .deck:fullscreen .slide-inner { max-width: 1320px; }
+  .deck:fullscreen h1 { font-size: 2.9rem; }
+  .deck:fullscreen .slide-title h1 { font-size: 4.5rem; }
+  .deck:fullscreen .content { font-size: 1.24rem; }
+  .deck:fullscreen .note { font-size: 1.1rem; }
+  .deck:fullscreen .kicker { font-size: .92rem; }
+  .deck:fullscreen .card-desc, .deck:fullscreen .row-why { font-size: 1rem; }
+  .deck:fullscreen .tri-col li { font-size: 1.02rem; }
+  .deck:fullscreen .slide.has-figure .content { font-size: 1.14rem; }
+  .deck:fullscreen .slide.has-figure h1 { font-size: 2.4rem; }
+
+  /* Click zones */
+  .zone { position: absolute; top: 0; bottom: 56px; width: 19%; cursor: pointer; z-index: 2; }
+  .zone-prev { left: 0; }
+  .zone-next { right: 0; }
+
+  .bar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 56px; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 22px; gap: 16px;
+  }
+  .dots { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; cursor: pointer; background: var(--border);
+    border: none; padding: 0; transition: all .2s ease;
+  }
+  .dot:hover { transform: scale(1.3); opacity: .75; }
+  .dot.active { width: 24px; border-radius: 4px; }
+  .dot-glass.active { background: var(--glass); }
+  .dot-metal.active { background: var(--metal); }
+  .dot-paper.active { background: var(--paper); }
+  .dot-plastic.active { background: var(--plastic); }
+  .bar-right { display: flex; align-items: center; gap: 13px; }
+  .counter { font-size: .84rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fs-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 7px; padding: 5px 11px; font-size: .79rem; cursor: pointer;
+  }
+  .fs-btn:hover { color: var(--text); }
+  .progress { position: absolute; top: 0; left: 0; height: 3px; z-index: 6; background: var(--glass); transition: width .3s ease, background .3s ease; }
+
+  @media (max-width: 980px) {
+    .cards, .arch, .tri, .fsplit { flex-direction: column; }
+    .row { grid-template-columns: 1fr; gap: 5px; }
+    .slide.has-figure { overflow-y: auto; }
+    .slide.has-figure .slide-inner { flex-direction: column; height: auto; margin: auto; }
+    .split-fig img { max-height: 300px; }
+  }
+"""
+
+
 def _build_css(theme):
     t = THEMES[theme]
     return f"""
 <style>
-  * {{ box-sizing: border-box; }}
-  body {{
-    margin: 0;
-    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }}
   .deck {{
     --text: {t['text']};
     --muted: {t['muted']};
     --strong: {t['strong']};
     --surface: {t['surface']};
+    --surface-alt: {t['surface_alt']};
     --border: {t['border']};
+    --watermark: {t['watermark']};
+    --img-bg: {t['img_bg']};
+    --shadow: {t['shadow']};
+    --pos: {t['pos']};
+    --neg: {t['neg']};
     --glass: {BIN_COLORS['glass']};
     --metal: {BIN_COLORS['metal']};
     --paper: {BIN_COLORS['paper']};
     --plastic: {BIN_COLORS['plastic']};
-    --pos: {t['pos']};
-    --neg: {t['neg']};
-    position: relative;
-    height: 700px;
-    border-radius: 18px;
-    overflow: hidden;
     background: {t['bg']};
-    color: var(--text);
-    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
-    user-select: none;
   }}
-  .deck:fullscreen {{ height: 100vh; border-radius: 0; }}
-
-  /* Recycling mobius watermark, bottom-right of every slide. */
-  .deck::after {{
-    content: "\\267B";
-    position: absolute;
-    right: -30px; bottom: -76px;
-    font-size: 310px; line-height: 1;
-    color: {t['watermark']};
-    pointer-events: none;
-    z-index: 0;
-  }}
-
-  /* Four-colour ribbon removed — the per-slide accent carries the recycling
-     identity on its own, without eating horizontal space. */
-
-  /* Flex column with auto margins on the inner block: content sits centred
-     vertically at any deck height. This is what fixes fullscreen — the deck
-     grows to 100vh, and without centring everything stayed pinned to the top
-     with a large dead area underneath. Auto margins (rather than
-     justify-content: center) also mean a slide taller than the viewport still
-     scrolls from its top instead of having the top clipped off. */
-  .slide {{
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    padding: 42px 58px 74px;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(14px);
-    transition: opacity .32s ease, transform .32s ease;
-    overflow-y: auto;
-    z-index: 1;
-  }}
-  .slide.active {{ opacity: 1; visibility: visible; transform: none; }}
-  .slide-inner {{ max-width: 1000px; width: 100%; margin: auto; }}
-
-  /* Slides that carry a chart use a two-column layout: text on the left,
-     figure on the right, both sized to the slide instead of stacking. Stacked
-     vertically these slides overflowed and forced scrolling to reach the
-     chart, which is useless mid-presentation. min-height: 0 on the flex
-     children is what lets them actually shrink to fit rather than pushing
-     past the bottom edge. */
-  .slide.has-figure {{ overflow: hidden; }}
-  .slide.has-figure .slide-inner {{
-    display: flex; flex-direction: row; align-items: stretch;
-    gap: 30px; max-width: 1440px; height: 100%; margin: 0 auto;
-  }}
-  .split-text {{
-    flex: 1 1 50%; min-height: 0; overflow-y: auto;
-    display: flex; flex-direction: column;
-    /* "safe" centring: centres when there's room, but falls back to top
-       alignment when the column overflows, instead of clipping the heading
-       off the top. Browsers without support drop this and default to
-       flex-start, which is the same safe behaviour. */
-    justify-content: safe center;
-  }}
-  .split-fig {{
-    flex: 1 1 50%; min-height: 0;
-    display: flex; align-items: center; justify-content: center;
-  }}
-  .split-fig img {{
-    max-width: 100%; max-height: 100%;
-    width: auto; height: auto; object-fit: contain;
-    border-radius: 10px; background: {t['img_bg']}; padding: 10px;
-  }}
-  /* Figure slides run a little tighter so the text column fits without scrolling. */
-  .slide.has-figure .content {{ font-size: 1rem; line-height: 1.52; }}
-  .slide.has-figure h1 {{ font-size: 1.95rem; margin-bottom: 14px; }}
-  .slide.has-figure li {{ margin-bottom: 7px; }}
-  .slide.has-figure .tier {{ padding: 8px 14px; }}
-  .slide.has-figure table {{ font-size: .93rem; }}
-  .slide.has-figure td, .slide.has-figure th {{ padding: 6px 9px; }}
-  .deck:fullscreen .slide.has-figure .content {{ font-size: 1.2rem; }}
-  .deck:fullscreen .slide.has-figure h1 {{ font-size: 2.5rem; }}
-
-  /* Narrow viewport (phone / small window): stack instead of squeezing. */
-  @media (max-width: 900px) {{
-    .slide.has-figure {{ overflow-y: auto; }}
-    .slide.has-figure .slide-inner {{ flex-direction: column; height: auto; margin: auto; }}
-    .split-fig img {{ max-height: 300px; }}
-  }}
-
-  /* Fullscreen: scale type up for projector distance. */
-  .deck:fullscreen .slide {{ padding: 54px 84px 84px; }}
-  .deck:fullscreen .slide-inner {{ max-width: 1240px; }}
-  .deck:fullscreen h1 {{ font-size: 3rem; }}
-  .deck:fullscreen .slide-title h1 {{ font-size: 4.6rem; }}
-  .deck:fullscreen .content {{ font-size: 1.35rem; }}
-  .deck:fullscreen .note {{ font-size: 1.15rem; }}
-  .deck:fullscreen .kicker {{ font-size: .95rem; }}
-  .deck:fullscreen .figure img {{ max-height: 56vh; }}
-
-  .slide-title {{ text-align: center; }}
-  .slide-title h1 {{ font-size: 3.5rem; border: none; padding: 0; margin-bottom: .5rem; }}
-  .slide-title .kicker {{ justify-content: center; }}
-
-  .kicker {{
-    display: inline-flex; align-items: center; gap: 9px;
-    font-size: .76rem; letter-spacing: .17em; text-transform: uppercase;
-    color: var(--accent); margin-bottom: 13px; font-weight: 700;
-  }}
-  .kicker-dot {{ width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }}
-  h1 {{
-    font-size: 2.25rem; line-height: 1.15; margin: 0 0 20px;
-    padding-bottom: 13px; font-weight: 700; color: var(--strong);
-    border-bottom: 2px solid var(--accent);
-  }}
-  .content {{ font-size: 1.06rem; line-height: 1.6; }}
-  ul {{ padding-left: 20px; margin: 0 0 14px; }}
-  li {{ margin-bottom: 10px; }}
-  li::marker {{ color: var(--accent); }}
-  /* Bold takes the slide's accent colour — key terms read as highlights
-     rather than just heavier text, which is much easier to scan. */
-  b {{ color: var(--accent-text); font-weight: 700; }}
-  .lead {{ font-size: 1.35rem; color: var(--text); margin: 0 0 16px; }}
-  .team {{ font-size: 1.05rem; color: var(--muted); margin: 18px 0 0; }}
-  .note {{ font-size: .95rem; color: var(--muted); margin: 8px 0 12px; }}
-
-  .illus {{ width: 100%; height: auto; margin: 4px 0 10px; color: var(--text); }}
-
-  .callout {{
-    margin-top: 14px; padding: 14px 19px;
-    background: var(--surface);
-    border-left: 4px solid var(--accent);
-    border-radius: 0 10px 10px 0; font-size: 1rem;
-  }}
-
-  table {{ width: 100%; border-collapse: collapse; font-size: 1rem; margin: 6px 0 10px; }}
-  th {{
-    text-align: left; padding: 9px 12px;
-    color: var(--accent-text); font-size: .76rem;
-    letter-spacing: .1em; text-transform: uppercase;
-    border-bottom: 2px solid var(--accent);
-  }}
-  td {{ padding: 9px 12px; border-bottom: 1px solid var(--border); }}
-  th.num, td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
-  tr.highlight td {{ background: var(--surface); font-weight: 700; }}
-  .up {{ color: var(--pos); font-weight: 700; }}
-  .down {{ color: var(--neg); font-weight: 700; }}
-
-  /* Grouped result bands — the three performance tiers. */
-  .tiers {{ display: flex; flex-direction: column; gap: 9px; margin: 12px 0; }}
-  .tier {{
-    display: flex; align-items: baseline; gap: 16px;
-    padding: 11px 17px; border-radius: 10px;
-    background: var(--surface); border-left: 4px solid var(--accent);
-  }}
-  .tier-score {{
-    font-size: 1.2rem; font-weight: 700; color: var(--accent-text);
-    min-width: 104px; font-variant-numeric: tabular-nums;
-  }}
-  .tier-body {{ flex: 1; }}
-  .tier-name {{ font-weight: 700; color: var(--strong); }}
-  .tier-note {{ font-size: .9rem; color: var(--muted); }}
-
-  .chips {{ display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0; }}
-  .chips-center {{ justify-content: center; }}
-  .chip {{
-    padding: 7px 20px; border-radius: 999px;
-    font-weight: 700; font-size: .92rem; color: #11201b;
-  }}
-  .chip-glass {{ background: var(--glass); }}
-  .chip-metal {{ background: var(--metal); }}
-  .chip-paper {{ background: var(--paper); color: #fff; }}
-  .chip-plastic {{ background: var(--plastic); }}
-
-  .bins {{ display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0; }}
-  .bin {{
-    flex: 1; min-width: 140px; border-radius: 12px; padding: 13px 16px;
-    background: var(--surface); border-top: 4px solid;
-  }}
-  .bin-glass {{ border-color: var(--glass); }}
-  .bin-metal {{ border-color: var(--metal); }}
-  .bin-paper {{ border-color: var(--paper); }}
-  .bin-plastic {{ border-color: var(--plastic); }}
-  .bin-icon {{ font-size: 1.5rem; display: block; }}
-  .bin-name {{ display: block; font-weight: 700; margin-top: 3px; color: var(--strong); }}
-  .bin-where {{ display: block; font-size: .82rem; color: var(--muted); }}
-
-  .stats {{ display: flex; gap: 13px; flex-wrap: wrap; margin-top: 12px; }}
-  .stat {{
-    flex: 1; min-width: 130px; background: var(--surface);
-    border: 1px solid var(--border); border-left: 4px solid var(--accent);
-    border-radius: 12px; padding: 13px 17px;
-  }}
-  .stat-num {{ display: block; font-size: 1.65rem; font-weight: 700; color: var(--accent); }}
-  .stat-label {{ display: block; font-size: .82rem; color: var(--muted); margin-top: 2px; }}
-
-  .figure {{ margin-top: 12px; text-align: center; }}
-  .figure img {{
-    max-width: 100%; max-height: 385px;
-    border-radius: 10px; background: {t['img_bg']}; padding: 10px;
-  }}
-  .figure.missing {{
-    padding: 24px; border: 1px dashed var(--accent);
-    border-radius: 12px; color: var(--muted); font-size: .94rem; text-align: left;
-  }}
-  code {{ background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: .88em; }}
-
-  /* Click zones — left edge goes back, right edge goes forward. */
-  .zone {{ position: absolute; top: 0; bottom: 58px; width: 20%; cursor: pointer; z-index: 2; }}
-  .zone-prev {{ left: 0; }}
-  .zone-next {{ right: 0; }}
-
-  .bar {{
-    position: absolute; left: 0; right: 0; bottom: 0; height: 58px; z-index: 5;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 22px; gap: 16px;
-  }}
-  .dots {{ display: flex; gap: 7px; flex-wrap: wrap; }}
-  .dot {{
-    width: 9px; height: 9px; border-radius: 50%; cursor: pointer;
-    background: var(--border); border: none; padding: 0; transition: all .2s ease;
-  }}
-  .dot:hover {{ transform: scale(1.3); opacity: .8; }}
-  .dot.active {{ width: 26px; border-radius: 5px; }}
-  .dot-glass.active {{ background: var(--glass); }}
-  .dot-metal.active {{ background: var(--metal); }}
-  .dot-paper.active {{ background: var(--paper); }}
-  .dot-plastic.active {{ background: var(--plastic); }}
-  .bar-right {{ display: flex; align-items: center; gap: 14px; }}
-  .counter {{ font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }}
-  .fs-btn {{
-    background: var(--surface); border: 1px solid var(--border);
-    color: var(--muted); border-radius: 7px; padding: 5px 11px;
-    font-size: .8rem; cursor: pointer;
-  }}
-  .fs-btn:hover {{ color: var(--text); }}
-
-  .progress {{
-    position: absolute; top: 0; left: 0; height: 3px; z-index: 6;
-    background: var(--glass); transition: width .3s ease, background .3s ease;
-  }}
+{STATIC_CSS}
 </style>
 """
 
@@ -949,18 +1097,15 @@ _DECK_JS = """
       slides[current].scrollTop = 0;
       counter.textContent = (current + 1) + ' / ' + slides.length;
       progress.style.width = ((current + 1) / slides.length * 100) + '%';
-      // Progress bar takes on the current slide's bin colour.
       progress.style.background = getComputedStyle(slides[current]).getPropertyValue('--accent');
     }
 
     deck.querySelector('.zone-next').addEventListener('click', function () { go(current + 1); });
     deck.querySelector('.zone-prev').addEventListener('click', function () { go(current - 1); });
-    dots.forEach(function (dot, i) {
-      dot.addEventListener('click', function () { go(i); });
-    });
+    dots.forEach(function (dot, i) { dot.addEventListener('click', function () { go(i); }); });
 
     // Keyboard. The deck has tabindex so it can hold focus inside the iframe;
-    // click it once and the arrow keys / space / a presenter clicker all work.
+    // click it once and arrow keys / space / a presenter clicker all work.
     deck.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { go(current + 1); e.preventDefault(); }
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { go(current - 1); e.preventDefault(); }
@@ -970,7 +1115,6 @@ _DECK_JS = """
     });
     deck.focus();
 
-    // Touch swipe, for presenting from a tablet.
     var startX = null;
     deck.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; }, { passive: true });
     deck.addEventListener('touchend', function (e) {
@@ -1001,9 +1145,8 @@ def build_deck_html(theme=None):
 
     dots_html = ""
     for i, slide in enumerate(SLIDES):
-        accent_name = slide.get("accent", "glass")
         dots_html += (
-            '<button class="dot dot-' + accent_name
+            '<button class="dot dot-' + slide.get("accent", "glass")
             + (" active" if i == 0 else "")
             + '" title="Slide ' + str(i + 1) + '"></button>'
         )
@@ -1014,10 +1157,8 @@ def build_deck_html(theme=None):
         + '<div class="progress" style="width:0%"></div>'
         + slides_html
         + '<div class="zone zone-prev"></div><div class="zone zone-next"></div>'
-        + '<div class="bar">'
-        + '<div class="dots">' + dots_html + "</div>"
-        + '<div class="bar-right">'
-        + '<span class="counter">1 / ' + str(len(SLIDES)) + "</span>"
+        + '<div class="bar"><div class="dots">' + dots_html + "</div>"
+        + '<div class="bar-right"><span class="counter">1 / ' + str(len(SLIDES)) + "</span>"
         + '<button class="fs-btn">&#9906; Fullscreen</button>'
         + "</div></div></div>"
         + _DECK_JS
