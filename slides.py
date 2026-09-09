@@ -306,6 +306,8 @@ SLIDES = [
               judged on <b>identical data</b> &mdash; that's what makes the comparison fair.
             </div>
         """,
+        "figure": "fig_system_flowchart.png",
+        "figure_caption": "System flowchart &mdash; report Fig. 3.1.1",
     },
     {
         "kicker": "Dataset",
@@ -449,6 +451,8 @@ SLIDES = [
                     <span class="fbox sm">2048-d feature</span>
                     <span class="farrow inline">&rarr;</span>
                     <span class="fbox sm">dense projection</span>
+                    <span class="farrow inline">&rarr;</span>
+                    <span class="fbox sm">512-d</span>
                   </div>
                 </div>
                 <div class="fbranch">
@@ -463,7 +467,8 @@ SLIDES = [
                 <span class="farrow">&darr;</span>
                 <span class="farrow">&darr;</span>
               </div>
-              <div class="fnode join">Concatenate &nbsp;&rarr;&nbsp; joint representation</div>
+              <div class="fnode join">Concatenate &nbsp;&rarr;&nbsp; 1024-d joint representation</div>
+              <div class="fsplit arrows one"><span class="farrow">&darr;</span></div>
               <div class="fhead">
                 <b>Classification head:</b>
                 <span class="fbox sm">dense</span><span class="farrow inline">&rarr;</span>
@@ -576,31 +581,6 @@ SLIDES = [
             </div>
         """,
         "figure": "fig8_clip_verify_effect.png",
-    },
-    {
-        "kicker": "Results",
-        "accent": "metal",
-        "title": "Is the Fusion Model Actually Better?",
-        "body": """
-            <p class="note">Our proposed approach came second on raw accuracy &mdash; but accuracy at
-            one fixed threshold isn't the whole picture:</p>
-            <ul class="tight">
-              <li>On <b>ROC / AUC</b> fusion is <b>strongest overall</b>: highest for Paper
-                  (<b>1.000</b>) and Plastic (<b>0.997</b>), tied on Glass (0.994), behind on Metal
-                  by 0.001.</li>
-              <li>It beat ResNet50's <b>Paper F1</b> (0.990 vs 0.987) while losing on Glass, Metal and
-                  Plastic &mdash; <b>complementary</b>, not uniformly better or worse.</li>
-              <li>CLIP was trained on general internet images, so it helps where a class has a strong
-                  everyday visual concept, and helps less where the call needs <b>fine-grained
-                  material texture</b> &mdash; what ResNet50 already learns.</li>
-            </ul>
-            <div class="callout">
-              <b>Our honest conclusion:</b> feature-level fusion is <b>feasible and trains stably</b>,
-              and produces genuinely different error patterns &mdash; but on this dataset it is a
-              <b>trade-off, not a clear win</b>.
-            </div>
-        """,
-        "figure": "fig4_roc_curves.png",
     },
     {
         "kicker": "Conclusion",
@@ -721,10 +701,12 @@ def _build_slide_html(slide, index, theme):
     if has_figure:
         parts.append("</div></div>")  # /split-inner, /split-text
         uri = _figure_data_uri(slide["figure"])
+        caption = slide.get("figure_caption")
+        cap_html = ('<div class="fig-caption">' + caption + "</div>") if caption else ""
         if uri:
             parts.append(
                 '<div class="split-fig"><img src="' + uri
-                + '" alt="' + slide["figure"] + '"></div>'
+                + '" alt="' + slide["figure"] + '">' + cap_html + "</div>"
             )
         else:
             parts.append(
@@ -775,6 +757,12 @@ STATIC_CSS = """
     display: flex; flex-direction: column; justify-content: safe center;
   }
   .split-fig { flex: 1 1 50%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .split-fig { flex-direction: column; gap: 8px; }
+  .fig-caption {
+    font-size: .8rem; color: var(--muted); text-align: center; flex: none;
+  }
+  /* A single centred connector arrow (Concatenate -> classification head). */
+  .fsplit.arrows.one { justify-content: center; }
   .split-fig img {
     max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain;
     border-radius: 10px; background: var(--img-bg); padding: 10px;
@@ -1116,6 +1104,16 @@ def _build_css(theme):
   .chip, .pill, .tag, .seg, .fbox, .fnode, .arch-cfg {{ font-size: clamp(.42rem, 1.5vh, .92rem); }}
   .illus {{ max-height: 32vh; }}
   .arrows, .farrow, .step-num {{ font-size: clamp(.5rem, 1.4vh, 1rem); }}
+  /* Vertical connectors carry the flow between stages, so make them read as
+     arrows rather than stray punctuation. Inline (&rarr;) ones inside a chain
+     stay small so they don't crowd the boxes they sit between. */
+  .fsplit .farrow, .fbranch > .farrow {{
+    font-size: clamp(.85rem, 2.1vh, 1.4rem);
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }}
+  .farrow.inline {{ font-size: clamp(.55rem, 1.4vh, .95rem); opacity: .85; }}
   table {{ font-size: clamp(.45rem, 1.6vh, 1rem); }}
   td, th {{ padding: clamp(2px, .8vh, 9px) clamp(4px, 1vh, 12px); }}
   .splitbar .seg {{ padding: clamp(4px, 1.4vh, 13px) clamp(4px, 1vh, 10px); }}
