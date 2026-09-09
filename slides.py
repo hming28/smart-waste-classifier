@@ -702,7 +702,11 @@ def _build_slide_html(slide, index, theme):
     # With a figure the slide splits into two columns, so the heading and body go
     # in their own column rather than sitting above the chart.
     if has_figure:
-        parts.append('<div class="split-text">')
+        # .split-inner exists so auto-fit has something to shrink: the column
+        # itself is sized by the flex row, so scaling it would shrink the
+        # available height by exactly as much as the content, and the overflow
+        # ratio would never change.
+        parts.append('<div class="split-text"><div class="split-inner">')
 
     if slide.get("kicker"):
         # Section labels are numbered like "04 · PROPOSED SYSTEM"; the cover
@@ -715,7 +719,7 @@ def _build_slide_html(slide, index, theme):
     parts.append('<div class="content">' + slide.get("body", "") + "</div>")
 
     if has_figure:
-        parts.append("</div>")  # /split-text
+        parts.append("</div></div>")  # /split-inner, /split-text
         uri = _figure_data_uri(slide["figure"])
         if uri:
             parts.append(
@@ -1045,7 +1049,7 @@ STATIC_CSS = """
     .row { grid-template-columns: 1fr; gap: 5px; }
     .slide.has-figure { overflow-y: auto; }
     .slide.has-figure .slide-inner { flex-direction: column; height: auto; margin: auto; }
-    .split-fig img { max-height: 300px; }
+    .split-fig img { max-height: 26vh; }
   }
 """
 
@@ -1073,6 +1077,56 @@ def _build_css(theme):
     background: {t['bg']};
   }}
 {STATIC_CSS}
+
+  /* ── Fit-to-height scaling ───────────────────────────────────────────────
+     Everything above sizes type in rem, which is measured against the page
+     root and so ignores how much room the deck actually has. Under browser
+     zoom the iframe keeps its physical size but loses CSS pixels, so
+     rem-sized content overflows and the slide starts scrolling — which is
+     what clipped the architecture cards mid-presentation.
+
+     These overrides re-express the main type and spacing in vh, clamped at
+     both ends so nothing becomes unreadable or absurd. Because the deck is a
+     fixed-height box, 1vh tracks the space actually available, so slides now
+     shrink to fit at any zoom level and grow in fullscreen from the same
+     rules. They are declared last so they win over the earlier fixed sizes.  */
+  .slide {{ padding: clamp(8px, 4.4vh, 46px) clamp(12px, 3.6vw, 60px) clamp(34px, 7.6vh, 78px); }}
+  h1 {{
+    font-size: clamp(.78rem, 3.5vh, 2.3rem);
+    margin: 0 0 clamp(3px, 1.7vh, 20px);
+    padding-bottom: clamp(2px, 1vh, 13px);
+  }}
+  .slide-title h1 {{ font-size: clamp(1.1rem, 6.8vh, 4rem); }}
+  .kicker {{ font-size: clamp(.4rem, 1.3vh, .78rem); margin-bottom: clamp(2px, 1.2vh, 13px); }}
+  .content {{ font-size: clamp(.48rem, 1.92vh, 1.06rem); }}
+  .slide.has-figure .content {{ font-size: clamp(.46rem, 1.75vh, 1rem); }}
+  li {{ margin-bottom: clamp(1px, .85vh, 10px); }}
+  .note, .caption, .fnote, .foot-notes, .probe-note {{ font-size: clamp(.42rem, 1.55vh, .95rem); margin: clamp(2px,.9vh,12px) 0; }}
+  .cards, .rows, .arch, .tri, .bins, .steps, .stats, .tiers, .flow, .fusion {{ gap: clamp(2px, 1.05vh, 13px); }}
+  .card, .row, .arch-col, .tri-col, .bin, .step, .fbox, .fnode, .tier, .stat, .callout, .banner {{
+    padding: clamp(3px, 1.35vh, 16px) clamp(5px, 1.5vh, 18px);
+  }}
+  .card-num {{ font-size: clamp(.7rem, 3vh, 1.9rem); }}
+  .card-title, .arch-name, .row-name {{ font-size: clamp(.44rem, 1.6vh, .92rem); }}
+  .card-desc, .row-why, .row-role, .arch-role, .tri-col li, .bin-where {{
+    font-size: clamp(.42rem, 1.55vh, .92rem);
+  }}
+  .tier-score, .stat-num {{ font-size: clamp(.58rem, 2.2vh, 1.35rem); }}
+  .banner {{ font-size: clamp(.5rem, 1.9vh, 1.05rem); }}
+  .chip, .pill, .tag, .seg, .fbox, .fnode, .arch-cfg {{ font-size: clamp(.42rem, 1.5vh, .92rem); }}
+  .illus {{ max-height: 32vh; }}
+  .arrows, .farrow, .step-num {{ font-size: clamp(.5rem, 1.4vh, 1rem); }}
+  table {{ font-size: clamp(.45rem, 1.6vh, 1rem); }}
+  td, th {{ padding: clamp(2px, .8vh, 9px) clamp(4px, 1vh, 12px); }}
+  .splitbar .seg {{ padding: clamp(4px, 1.4vh, 13px) clamp(4px, 1vh, 10px); }}
+
+  /* Fullscreen simply sits at the upper end of the same clamps. */
+  .deck:fullscreen h1 {{ font-size: clamp(1.6rem, 4.3vh, 3rem); }}
+  .deck:fullscreen .slide-title h1 {{ font-size: clamp(2.4rem, 8vh, 4.8rem); }}
+  .deck:fullscreen .content {{ font-size: clamp(.9rem, 2.2vh, 1.35rem); }}
+  .deck:fullscreen .slide.has-figure .content {{ font-size: clamp(.85rem, 2vh, 1.2rem); }}
+  .deck:fullscreen .note {{ font-size: clamp(.8rem, 1.8vh, 1.1rem); }}
+  .deck:fullscreen .kicker {{ font-size: clamp(.65rem, 1.5vh, .92rem); }}
 </style>
 """
 
@@ -1098,7 +1152,64 @@ _DECK_JS = """
       counter.textContent = (current + 1) + ' / ' + slides.length;
       progress.style.width = ((current + 1) / slides.length * 100) + '%';
       progress.style.background = getComputedStyle(slides[current]).getPropertyValue('--accent');
+      fitSlide(slides[current]);
     }
+
+    // Auto-fit: shrink a slide until it fits the deck.
+    //
+    // The CSS clamps already scale type with deck height, but content varies a
+    // lot from slide to slide -- the architecture slide stacks far more boxes
+    // than a bullet slide -- so no single set of clamps fits every slide at
+    // every zoom level. This is the backstop: measure the slide, and if it
+    // still overflows, step the CSS `zoom` down until it doesn't.
+    //
+    // `zoom` is used rather than `transform: scale()` on purpose: zoom
+    // reflows, so the scrollbar and the flex layout agree with what's on
+    // screen, whereas a transform would shrink the pixels but leave the
+    // layout box (and the scrollbar) at the old size. Browsers without zoom
+    // support simply keep the current behaviour and scroll.
+    function fitSlide(slide) {
+      var outer = slide.querySelector('.slide-inner');
+      var textInner = slide.querySelector('.split-inner');
+      var text = slide.querySelector('.split-text');
+      if (!outer) { return; }
+      outer.style.zoom = '';
+      if (textInner) { textInner.style.zoom = ''; }
+
+      function overflowing() {
+        if (slide.scrollHeight > slide.clientHeight + 1) { return true; }
+        return !!text && text.scrollHeight > text.clientHeight + 1;
+      }
+      // Floor at 0.42: below that it's unreadable, and scrolling is the
+      // better failure mode than microscopic text.
+      function shrink(el) {
+        for (var z = 0.97; z >= 0.42; z -= 0.025) {
+          el.style.zoom = z;
+          if (!overflowing()) { return true; }
+        }
+        return false;
+      }
+
+      if (!overflowing()) { return; }
+      // On a figure slide, shrink the text column first: the chart is the
+      // point of the slide and should stay as large as possible.
+      if (textInner && shrink(textInner)) { return; }
+      // Not enough on its own -- e.g. once the columns stack on a narrow or
+      // heavily zoomed viewport, the figure adds height that shrinking the
+      // text can't offset. Scale the whole slide instead.
+      // Keep the text column at its floor rather than resetting it, then take
+      // the rest out of the slide as a whole.
+      shrink(outer);
+    }
+
+    // Re-fit on resize, on zoom changes, and when entering/leaving fullscreen.
+    var refit = function () { fitSlide(slides[current]); };
+    window.addEventListener('resize', refit);
+    document.addEventListener('fullscreenchange', function () {
+      // Wait for the fullscreen layout to settle before measuring.
+      setTimeout(refit, 80);
+    });
+    if (window.ResizeObserver) { new ResizeObserver(refit).observe(deck); }
 
     deck.querySelector('.zone-next').addEventListener('click', function () { go(current + 1); });
     deck.querySelector('.zone-prev').addEventListener('click', function () { go(current - 1); });
