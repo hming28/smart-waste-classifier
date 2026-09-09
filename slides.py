@@ -189,6 +189,47 @@ IOT_UPGRADE_SVG = f"""
 """
 
 
+MODEL_TIMELINE_SVG = f"""
+<svg viewBox="0 0 900 172" xmlns="http://www.w3.org/2000/svg" class="illus">
+  <line x1="40" y1="96" x2="860" y2="96" stroke="currentColor" stroke-opacity=".18" stroke-width="2"/>
+
+  <g>
+    <circle cx="90" cy="96" r="9" fill="{BIN_COLORS['glass']}"/>
+    <text x="90" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">CNN</text>
+    <text x="90" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">1998 &#8594;</text>
+    <text x="90" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">from scratch</text>
+  </g>
+  <g>
+    <circle cx="280" cy="96" r="9" fill="{BIN_COLORS['metal']}"/>
+    <text x="280" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">ResNet50</text>
+    <text x="280" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">2015</text>
+    <text x="280" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">Microsoft</text>
+  </g>
+  <g>
+    <circle cx="470" cy="96" r="9" fill="{BIN_COLORS['paper']}"/>
+    <text x="470" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">MobileNetV2</text>
+    <text x="470" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">2018</text>
+    <text x="470" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">Google &#183; built for phones</text>
+  </g>
+  <g>
+    <circle cx="660" cy="96" r="9" fill="{BIN_COLORS['plastic']}"/>
+    <text x="660" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">CLIP</text>
+    <text x="660" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">2021</text>
+    <text x="660" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">OpenAI &#183; learned from the web</text>
+  </g>
+  <g>
+    <circle cx="840" cy="96" r="12" fill="none" stroke="{BIN_COLORS['glass']}" stroke-width="3"/>
+    <circle cx="840" cy="96" r="5" fill="{BIN_COLORS['glass']}"/>
+    <text x="840" y="70" text-anchor="middle" font-size="13" font-weight="700"
+          fill="{BIN_COLORS['glass']}">Fusion</text>
+    <text x="840" y="122" text-anchor="middle" font-size="12"
+          fill="{BIN_COLORS['glass']}" opacity=".85">ours</text>
+    <text x="840" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">ResNet50 + CLIP</text>
+  </g>
+</svg>
+"""
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Slide content
 # ─────────────────────────────────────────────────────────────────────────────
@@ -260,38 +301,9 @@ SLIDES = [
             <p class="note">The five approaches we compare aren't five random choices &mdash;
             each is a different generation of image-recognition technique, put on the same
             845-image test set:</p>
-            <div class="timeline">
-              <div class="tl-item">
-                <span class="tl-dot"></span>
-                <span class="tl-year">1998</span>
-                <span class="tl-name">CNN</span>
-                <span class="tl-note">Convolutional networks &mdash; our from-scratch baseline</span>
-              </div>
-              <div class="tl-item">
-                <span class="tl-dot"></span>
-                <span class="tl-year">2015</span>
-                <span class="tl-name">ResNet50</span>
-                <span class="tl-note">Microsoft &mdash; residual connections enable very deep nets</span>
-              </div>
-              <div class="tl-item">
-                <span class="tl-dot"></span>
-                <span class="tl-year">2018</span>
-                <span class="tl-name">MobileNetV2</span>
-                <span class="tl-note">Google &mdash; lightweight, built for phones and edge devices</span>
-              </div>
-              <div class="tl-item">
-                <span class="tl-dot"></span>
-                <span class="tl-year">2021</span>
-                <span class="tl-name">CLIP</span>
-                <span class="tl-note">OpenAI &mdash; learned from image&ndash;text pairs across the web</span>
-              </div>
-              <div class="tl-item featured">
-                <span class="tl-dot"></span>
-                <span class="tl-year">Ours</span>
-                <span class="tl-name">Feature Fusion</span>
-                <span class="tl-note">Combines ResNet50's task-specific view with CLIP's general one</span>
-              </div>
-            </div>
+        """
+        + MODEL_TIMELINE_SVG
+        + """
             <div class="callout">
               <b>Why it matters:</b> if a newer or pretrained model wins, that tells us something
               different than if our own from-scratch CNN wins &mdash; the comparison is really a test
@@ -973,7 +985,10 @@ STATIC_CSS = """
   }
   .fusion { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
   .fnode { text-align: center; font-weight: 700; border-radius: 10px; padding: 9px; }
-  .fnode.top { background: var(--strong); color: #fff; align-self: center; padding: 9px 26px; }
+  .fnode.top {
+    background: var(--strong); color: #fff; align-self: center; padding: 9px 26px;
+    border: 2px solid var(--accent);
+  }
   .fnode.join { background: var(--accent); color: #fff; font-size: 1.05rem; }
   .fsplit { display: flex; gap: 14px; }
   .fsplit.arrows { justify-content: space-around; }
