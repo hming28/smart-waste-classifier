@@ -986,7 +986,7 @@ STATIC_CSS = """
   .fusion { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
   .fnode { text-align: center; font-weight: 700; border-radius: 10px; padding: 9px; }
   .fnode.top {
-    background: var(--strong); color: #fff; align-self: center; padding: 9px 26px;
+    background: var(--strong); color: #fff; padding: 9px 26px;
     border: 2px solid var(--accent);
   }
   .fnode.join { background: var(--accent); color: #fff; font-size: 1.05rem; }
