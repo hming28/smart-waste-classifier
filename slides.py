@@ -874,11 +874,11 @@ STATIC_CSS = """
   .cards { display: flex; gap: 13px; margin: 6px 0 12px; align-items: stretch; }
   .card {
     flex: 1; position: relative; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 13px; padding: 18px 16px 16px; box-shadow: var(--shadow);
-    display: flex; flex-direction: column; gap: 7px;
+    border-radius: 13px; padding: 20px 17px 18px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 9px; min-height: 32vh;
   }
   .card.featured { border: 2px solid var(--accent); }
-  .card-num { font-size: 2rem; font-weight: 800; color: var(--accent-text); line-height: 1; }
+  .card-num { font-size: 2.3rem; font-weight: 800; color: var(--accent-text); line-height: 1; }
   .card-title { font-weight: 800; letter-spacing: .07em; color: var(--strong); font-size: .95rem; }
   .card-desc { font-size: .87rem; color: var(--muted); line-height: 1.45; }
   .badge {
@@ -1178,7 +1178,7 @@ def _build_css(theme):
   .card, .row, .arch-col, .tri-col, .bin, .step, .fbox, .fnode, .tier, .stat, .callout, .banner {{
     padding: clamp(3px, 1.35vh, 16px) clamp(5px, 1.5vh, 18px);
   }}
-  .card-num {{ font-size: clamp(.7rem, 3vh, 1.9rem); }}
+  .card-num {{ font-size: clamp(.7rem, 3.4vh, 2.3rem); }}
   .card-title, .arch-name, .row-name {{ font-size: clamp(.44rem, 1.6vh, .92rem); }}
   .card-desc, .row-why, .row-role, .arch-role, .tri-col li, .bin-where {{
     font-size: clamp(.42rem, 1.55vh, .92rem);
