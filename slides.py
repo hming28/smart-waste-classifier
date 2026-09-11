@@ -196,7 +196,7 @@ MODEL_TIMELINE_SVG = f"""
   <g>
     <circle cx="90" cy="96" r="9" fill="{BIN_COLORS['glass']}"/>
     <text x="90" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">CNN</text>
-    <text x="90" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">1998 &#8594;</text>
+    <text x="90" y="122" text-anchor="middle" font-size="12" fill="currentColor" opacity=".6">1998</text>
     <text x="90" y="140" text-anchor="middle" font-size="11" fill="currentColor" opacity=".5">from scratch</text>
   </g>
   <g>
